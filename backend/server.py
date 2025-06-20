@@ -15,8 +15,10 @@ from bs4 import BeautifulSoup
 import re
 import json
 
-# Import our enhanced image service
+# Import our enhanced services
 from image_service import VehicleImageManager
+from ai_crm_service import AICRMService, Lead, LeadStatus, LeadScore, InquiryType, ConversationMessage
+from desking_service import DeskingService, DealCalculation, DealType, PaymentGrid, FIProduct, TradeIn, TaxInfo, FinanceTerms, LeaseTerms
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
