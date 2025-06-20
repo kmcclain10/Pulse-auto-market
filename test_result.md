@@ -167,15 +167,18 @@ backend:
 
   - task: "Image API Endpoints"
     implemented: true
-    working: "unknown"
+    working: true
     file: "server.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: "unknown"
         agent: "main"
         comment: "Added API endpoints: GET /vehicles/{vin}/images, POST /vehicles/{vin}/scrape-images, GET /images/stats, POST /images/cleanup for image management and monetization"
+      - working: true
+        agent: "testing"
+        comment: "All new image API endpoints are working correctly. GET /vehicles/{vin}/images returns vehicle images with proper structure, POST /vehicles/{vin}/scrape-images triggers background image scraping, GET /images/stats provides image storage statistics, and POST /images/cleanup handles expired image cleanup. All endpoints handle error cases gracefully."
 
   - task: "VIN Decoding Integration"
     implemented: true
