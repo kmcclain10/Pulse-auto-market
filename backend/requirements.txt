@@ -29,3 +29,4 @@ lxml>=5.1.0
 Pillow>=10.0.0
 selenium>=4.15.0
 python-multipart>=0.0.9
+emergentintegrations --extra-index-url https://d33sy5i8bnduwe.cloudfront.net/simple/
