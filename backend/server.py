@@ -825,6 +825,10 @@ async def create_vehicle_inquiry(vin: str, inquiry_data: dict, background_tasks:
         # Process through AI CRM
         lead = await ai_crm_service.process_new_lead(inquiry_data)
         
+        # Track usage for billing
+        if inquiry_data.get("dealer_id"):
+            await billing_service.track_usage(inquiry_data["dealer_id"], "leads_processed")
+        
         return {
             "message": "Inquiry received and processed",
             "lead_id": lead.id,
@@ -834,6 +838,198 @@ async def create_vehicle_inquiry(vin: str, inquiry_data: dict, background_tasks:
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing inquiry: {str(e)}")
+
+# Subscription Billing Routes
+@api_router.post("/subscriptions/create")
+async def create_subscription(request: CreateSubscriptionRequest):
+    """Create a new subscription with 90-day free trial"""
+    try:
+        result = await billing_service.create_subscription(request)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@api_router.get("/subscriptions/dealer/{dealer_id}", response_model=Subscription)
+async def get_dealer_subscription(dealer_id: str):
+    """Get subscription for a dealer"""
+    subscription = await billing_service.get_subscription_by_dealer(dealer_id)
+    if not subscription:
+        raise HTTPException(status_code=404, detail="No subscription found")
+    return subscription
+
+@api_router.put("/subscriptions/update")
+async def update_subscription(request: UpdateSubscriptionRequest):
+    """Update subscription plan"""
+    try:
+        result = await billing_service.update_subscription_plan(request)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@api_router.post("/subscriptions/{subscription_id}/cancel")
+async def cancel_subscription(subscription_id: str, immediate: bool = Query(False)):
+    """Cancel subscription"""
+    try:
+        result = await billing_service.cancel_subscription(subscription_id, immediate)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@api_router.get("/billing/dealer/{dealer_id}/history", response_model=List[PaymentHistory])
+async def get_payment_history(dealer_id: str, limit: int = Query(50, le=100)):
+    """Get payment history for a dealer"""
+    payments = await billing_service.get_payment_history(dealer_id, limit)
+    return payments
+
+@api_router.post("/billing/dealer/{dealer_id}/portal")
+async def create_billing_portal_session(dealer_id: str):
+    """Create Stripe billing portal session"""
+    try:
+        portal_url = await billing_service.create_billing_portal_session(dealer_id)
+        return {"portal_url": portal_url}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@api_router.get("/billing/dealer/{dealer_id}/summary")
+async def get_billing_summary(dealer_id: str):
+    """Get comprehensive billing summary"""
+    summary = await billing_service.get_billing_summary(dealer_id)
+    return summary
+
+@api_router.get("/billing/dealer/{dealer_id}/usage")
+async def check_usage_limits(dealer_id: str):
+    """Check usage limits for dealer"""
+    usage_info = await billing_service.check_usage_limits(dealer_id)
+    return usage_info
+
+@api_router.get("/plans")
+async def get_subscription_plans():
+    """Get all available subscription plans"""
+    plans = billing_service.get_plans()
+    return {"plans": plans}
+
+# Stripe Webhook Handler
+@api_router.post("/webhooks/stripe")
+async def stripe_webhook(request: Request):
+    """Handle Stripe webhook events"""
+    try:
+        import stripe
+        
+        payload = await request.body()
+        sig_header = request.headers.get("stripe-signature")
+        webhook_secret = os.getenv("STRIPE_WEBHOOK_SECRET")
+        
+        if not webhook_secret:
+            logger.warning("Stripe webhook secret not configured")
+            return {"status": "webhook secret not configured"}
+        
+        # Verify webhook signature
+        try:
+            event = stripe.Webhook.construct_event(
+                payload, sig_header, webhook_secret
+            )
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid payload")
+        except stripe.error.SignatureVerificationError:
+            raise HTTPException(status_code=400, detail="Invalid signature")
+        
+        # Handle the event
+        await billing_service.handle_webhook_event(event)
+        
+        return {"status": "success"}
+        
+    except Exception as e:
+        logger.error(f"Error handling Stripe webhook: {str(e)}")
+        raise HTTPException(status_code=500, detail="Webhook processing failed")
+
+# Enhanced dealer management with subscription info
+@api_router.get("/dealers/with-subscriptions")
+async def get_dealers_with_subscriptions():
+    """Get all dealers with their subscription information"""
+    try:
+        dealers = await db.dealers.find().to_list(1000)
+        dealers_with_subs = []
+        
+        for dealer in dealers:
+            subscription = await billing_service.get_subscription_by_dealer(dealer['id'])
+            dealer_info = {
+                **dealer,
+                "subscription": subscription.dict() if subscription else None,
+                "subscription_status": subscription.status if subscription else "none",
+                "plan": subscription.plan if subscription else None
+            }
+            dealers_with_subs.append(dealer_info)
+        
+        return dealers_with_subs
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error loading dealers: {str(e)}")
+
+# Middleware to check subscription status (add to routes that need limits)
+async def check_subscription_middleware(dealer_id: str, feature_type: str):
+    """Check if dealer has valid subscription and is within limits"""
+    try:
+        subscription = await billing_service.get_subscription_by_dealer(dealer_id)
+        if not subscription:
+            return {"allowed": False, "message": "No active subscription"}
+        
+        if subscription.status not in ["active", "trialing"]:
+            return {"allowed": False, "message": "Subscription not active"}
+        
+        # Check usage limits
+        usage_info = await billing_service.check_usage_limits(dealer_id)
+        if not usage_info["within_limits"]:
+            return {"allowed": False, "message": "Usage limits exceeded", "details": usage_info["blocked"]}
+        
+        return {"allowed": True, "usage_info": usage_info}
+        
+    except Exception as e:
+        logger.error(f"Error checking subscription for dealer {dealer_id}: {str(e)}")
+        return {"allowed": False, "message": "Error checking subscription"}
+
+# Protected route example (with usage tracking)
+@api_router.post("/vehicles/protected", response_model=Vehicle)
+async def create_vehicle_protected(vehicle: VehicleCreate, background_tasks: BackgroundTasks):
+    """Create a new vehicle listing (subscription required)"""
+    # Check subscription
+    if not vehicle.dealer_name:
+        raise HTTPException(status_code=400, detail="Dealer information required")
+    
+    # Find dealer ID (in real app, this would come from auth)
+    dealer = await db.dealers.find_one({"name": vehicle.dealer_name})
+    if not dealer:
+        raise HTTPException(status_code=404, detail="Dealer not found")
+    
+    # Check subscription limits
+    subscription_check = await check_subscription_middleware(dealer['id'], "vehicles")
+    if not subscription_check["allowed"]:
+        raise HTTPException(status_code=403, detail=subscription_check["message"])
+    
+    # Create vehicle (existing logic)
+    vehicle_dict = vehicle.dict()
+    vehicle_obj = Vehicle(**vehicle_dict)
+    
+    # Calculate Deal Pulse rating
+    existing_vehicles = await db.vehicles.find().to_list(1000)
+    market_analysis = calculate_deal_pulse(vehicle_dict, existing_vehicles)
+    vehicle_obj.deal_pulse_rating = market_analysis['rating']
+    vehicle_obj.market_price_analysis = market_analysis
+    
+    # Insert vehicle
+    await db.vehicles.insert_one(vehicle_obj.dict())
+    
+    # Track usage for billing
+    await billing_service.track_usage(dealer['id'], "vehicles_listed")
+    
+    # Trigger image scraping in background if URL provided
+    if vehicle.scraped_from_url:
+        background_tasks.add_task(
+            image_manager.scrape_and_store_images,
+            vehicle_obj.id,
+            vehicle_obj.vin,
+            vehicle.scraped_from_url
+        )
+    
+    return vehicle_obj
 
 # Include the router in the main app
 app.include_router(api_router)
