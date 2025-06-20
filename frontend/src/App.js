@@ -5,6 +5,646 @@ import axios from "axios";
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
 
+// Repair Shop Card Component
+const RepairShopCard = ({ shop, onViewDetails, onBookAppointment }) => {
+  const renderStars = (rating) => {
+    const stars = [];
+    for (let i = 1; i <= 5; i++) {
+      stars.push(
+        <span key={i} className={`text-lg ${i <= rating ? 'text-yellow-400' : 'text-gray-300'}`}>
+          ★
+        </span>
+      );
+    }
+    return stars;
+  };
+
+  return (
+    <div className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow duration-300">
+      {/* Shop Header */}
+      <div className="p-4 border-b border-gray-200">
+        <div className="flex justify-between items-start mb-2">
+          <h3 className="text-lg font-semibold text-gray-900">{shop.name}</h3>
+          {shop.featured && (
+            <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full">
+              Featured
+            </span>
+          )}
+        </div>
+        
+        <div className="flex items-center mb-2">
+          <div className="flex items-center mr-4">
+            {renderStars(shop.rating)}
+            <span className="ml-1 text-sm text-gray-600">({shop.review_count})</span>
+          </div>
+          {shop.certifications.includes("ASE Certified") && (
+            <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">
+              ASE Certified
+            </span>
+          )}
+        </div>
+
+        <p className="text-gray-600 text-sm mb-2">{shop.description}</p>
+        
+        <div className="text-sm text-gray-500">
+          <div>{shop.address}</div>
+          <div>{shop.city}, {shop.state} {shop.zip_code}</div>
+          <div className="mt-1">{shop.phone}</div>
+        </div>
+      </div>
+
+      {/* Services Preview */}
+      <div className="p-4 border-b border-gray-200">
+        <h4 className="font-medium text-gray-900 mb-2">Popular Services</h4>
+        <div className="grid grid-cols-1 gap-1">
+          {shop.services.filter(s => s.popular).slice(0, 3).map(service => (
+            <div key={service.id} className="flex justify-between text-sm">
+              <span className="text-gray-700">{service.name}</span>
+              <span className="text-gray-500">
+                ${service.price_range_min} - ${service.price_range_max}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Specialties */}
+      {shop.specialties.length > 0 && (
+        <div className="p-4 border-b border-gray-200">
+          <h4 className="font-medium text-gray-900 mb-2">Specialties</h4>
+          <div className="flex flex-wrap gap-1">
+            {shop.specialties.slice(0, 4).map(specialty => (
+              <span key={specialty} className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded">
+                {specialty}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Action Buttons */}
+      <div className="p-4">
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            onClick={() => onViewDetails(shop)}
+            className="bg-gray-100 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-200 transition-colors duration-200 text-sm"
+          >
+            View Details
+          </button>
+          <button
+            onClick={() => onBookAppointment(shop)}
+            className="bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors duration-200 text-sm"
+          >
+            Book Appointment
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Repair Shop Detail Modal
+const RepairShopDetailModal = ({ shop, onClose, onBookAppointment }) => {
+  const [reviews, setReviews] = useState([]);
+  const [loadingReviews, setLoadingReviews] = useState(false);
+
+  useEffect(() => {
+    if (shop) {
+      loadReviews();
+    }
+  }, [shop]);
+
+  const loadReviews = async () => {
+    setLoadingReviews(true);
+    try {
+      const response = await axios.get(`${API}/repair-shops/${shop.id}/reviews`);
+      setReviews(response.data);
+    } catch (error) {
+      console.error('Error loading reviews:', error);
+    } finally {
+      setLoadingReviews(false);
+    }
+  };
+
+  if (!shop) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg max-w-4xl w-full max-h-screen overflow-y-auto">
+        {/* Header */}
+        <div className="flex justify-between items-center p-6 border-b">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900">{shop.name}</h2>
+            <p className="text-gray-600">{shop.address}, {shop.city}, {shop.state}</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 text-2xl"
+          >
+            ×
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="p-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Left Column */}
+            <div>
+              <div className="mb-6">
+                <h3 className="text-lg font-semibold mb-3">About</h3>
+                <p className="text-gray-700">{shop.description}</p>
+                {shop.established_year && (
+                  <p className="text-sm text-gray-500 mt-2">
+                    Established {shop.established_year} • {shop.num_bays} Service Bays
+                  </p>
+                )}
+              </div>
+
+              <div className="mb-6">
+                <h3 className="text-lg font-semibold mb-3">Contact</h3>
+                <div className="space-y-1 text-gray-700">
+                  <div>📞 {shop.phone}</div>
+                  <div>📧 {shop.owner_email}</div>
+                  {shop.website && (
+                    <div>🌐 <a href={shop.website} target="_blank" rel="noopener noreferrer" className="text-blue-600">Website</a></div>
+                  )}
+                </div>
+              </div>
+
+              <div className="mb-6">
+                <h3 className="text-lg font-semibold mb-3">Business Hours</h3>
+                <div className="space-y-1 text-sm">
+                  {Object.entries(shop.business_hours).map(([day, hours]) => (
+                    <div key={day} className="flex justify-between">
+                      <span className="capitalize">{day}:</span>
+                      <span>
+                        {hours.closed ? 'Closed' : `${hours.open} - ${hours.close}`}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Right Column */}
+            <div>
+              <div className="mb-6">
+                <h3 className="text-lg font-semibold mb-3">Services</h3>
+                <div className="space-y-3">
+                  {shop.services.map(service => (
+                    <div key={service.id} className="border border-gray-200 rounded-lg p-3">
+                      <div className="flex justify-between items-start mb-1">
+                        <h4 className="font-medium">{service.name}</h4>
+                        <span className="text-sm text-gray-500">
+                          ${service.price_range_min} - ${service.price_range_max}
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-600">{service.description}</p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Est. {service.estimated_duration} minutes
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="mb-6">
+                <h3 className="text-lg font-semibold mb-3">Reviews ({shop.review_count})</h3>
+                {loadingReviews ? (
+                  <div className="text-center py-4">Loading reviews...</div>
+                ) : reviews.length > 0 ? (
+                  <div className="space-y-3">
+                    {reviews.slice(0, 3).map(review => (
+                      <div key={review.id} className="border border-gray-200 rounded-lg p-3">
+                        <div className="flex justify-between items-start mb-1">
+                          <h4 className="font-medium">{review.customer_name}</h4>
+                          <div className="flex">
+                            {[...Array(5)].map((_, i) => (
+                              <span key={i} className={`text-sm ${i < review.rating ? 'text-yellow-400' : 'text-gray-300'}`}>
+                                ★
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                        <p className="text-sm text-gray-600">{review.comment}</p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          {new Date(review.created_at).toLocaleDateString()}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-gray-500">No reviews yet</p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Book Appointment Button */}
+          <div className="border-t pt-4 text-center">
+            <button
+              onClick={() => onBookAppointment(shop)}
+              className="bg-blue-600 text-white px-8 py-3 rounded-md hover:bg-blue-700 transition-colors duration-200"
+            >
+              Book Appointment with {shop.name}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Appointment Booking Modal
+const AppointmentBookingModal = ({ shop, onClose, onConfirm }) => {
+  const [formData, setFormData] = useState({
+    customer_name: '',
+    customer_email: '',
+    customer_phone: '',
+    service_id: '',
+    appointment_date: '',
+    appointment_time: '',
+    service_description: '',
+    special_requests: '',
+    vehicle_year: '',
+    vehicle_make: '',
+    vehicle_model: ''
+  });
+  const [availableSlots, setAvailableSlots] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (formData.appointment_date) {
+      loadAvailableSlots();
+    }
+  }, [formData.appointment_date]);
+
+  const loadAvailableSlots = async () => {
+    try {
+      const response = await axios.get(`${API}/repair-shops/${shop.id}/availability?date=${formData.appointment_date}`);
+      setAvailableSlots(response.data.available_slots);
+    } catch (error) {
+      console.error('Error loading available slots:', error);
+    }
+  };
+
+  const handleInputChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    
+    try {
+      const appointmentDateTime = new Date(`${formData.appointment_date}T${formData.appointment_time}`);
+      
+      const appointmentData = {
+        repair_shop_id: shop.id,
+        service_id: formData.service_id,
+        customer_name: formData.customer_name,
+        customer_email: formData.customer_email,
+        customer_phone: formData.customer_phone,
+        appointment_date: appointmentDateTime.toISOString(),
+        service_description: formData.service_description,
+        special_requests: formData.special_requests,
+        vehicle_year: formData.vehicle_year ? parseInt(formData.vehicle_year) : null,
+        vehicle_make: formData.vehicle_make,
+        vehicle_model: formData.vehicle_model
+      };
+
+      const response = await axios.post(`${API}/appointments`, appointmentData);
+      onConfirm(response.data);
+      onClose();
+    } catch (error) {
+      alert('Error booking appointment: ' + (error.response?.data?.detail || error.message));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!shop) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg max-w-2xl w-full max-h-screen overflow-y-auto">
+        <div className="flex justify-between items-center p-6 border-b">
+          <h2 className="text-xl font-bold">Book Appointment - {shop.name}</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl">×</button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          {/* Customer Information */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Full Name *</label>
+              <input
+                type="text"
+                name="customer_name"
+                value={formData.customer_name}
+                onChange={handleInputChange}
+                className="w-full p-2 border border-gray-300 rounded-md"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Phone *</label>
+              <input
+                type="tel"
+                name="customer_phone"
+                value={formData.customer_phone}
+                onChange={handleInputChange}
+                className="w-full p-2 border border-gray-300 rounded-md"
+                required
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
+            <input
+              type="email"
+              name="customer_email"
+              value={formData.customer_email}
+              onChange={handleInputChange}
+              className="w-full p-2 border border-gray-300 rounded-md"
+              required
+            />
+          </div>
+
+          {/* Vehicle Information */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Vehicle Year</label>
+              <input
+                type="number"
+                name="vehicle_year"
+                value={formData.vehicle_year}
+                onChange={handleInputChange}
+                className="w-full p-2 border border-gray-300 rounded-md"
+                min="1990"
+                max="2025"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Make</label>
+              <input
+                type="text"
+                name="vehicle_make"
+                value={formData.vehicle_make}
+                onChange={handleInputChange}
+                className="w-full p-2 border border-gray-300 rounded-md"
+                placeholder="e.g., Toyota"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Model</label>
+              <input
+                type="text"
+                name="vehicle_model"
+                value={formData.vehicle_model}
+                onChange={handleInputChange}
+                className="w-full p-2 border border-gray-300 rounded-md"
+                placeholder="e.g., Camry"
+              />
+            </div>
+          </div>
+
+          {/* Service Selection */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Service Needed *</label>
+            <select
+              name="service_id"
+              value={formData.service_id}
+              onChange={handleInputChange}
+              className="w-full p-2 border border-gray-300 rounded-md"
+              required
+            >
+              <option value="">Select a service</option>
+              {shop.services.map(service => (
+                <option key={service.id} value={service.id}>
+                  {service.name} (${service.price_range_min} - ${service.price_range_max})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Date and Time */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Appointment Date *</label>
+              <input
+                type="date"
+                name="appointment_date"
+                value={formData.appointment_date}
+                onChange={handleInputChange}
+                className="w-full p-2 border border-gray-300 rounded-md"
+                min={new Date().toISOString().split('T')[0]}
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Preferred Time *</label>
+              <select
+                name="appointment_time"
+                value={formData.appointment_time}
+                onChange={handleInputChange}
+                className="w-full p-2 border border-gray-300 rounded-md"
+                required
+                disabled={!formData.appointment_date}
+              >
+                <option value="">Select time</option>
+                {availableSlots.map(slot => (
+                  <option key={slot} value={slot}>{slot}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Service Description *</label>
+            <textarea
+              name="service_description"
+              value={formData.service_description}
+              onChange={handleInputChange}
+              className="w-full p-2 border border-gray-300 rounded-md"
+              rows="3"
+              placeholder="Describe what you need help with..."
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Special Requests</label>
+            <textarea
+              name="special_requests"
+              value={formData.special_requests}
+              onChange={handleInputChange}
+              className="w-full p-2 border border-gray-300 rounded-md"
+              rows="2"
+              placeholder="Any special requests or notes..."
+            />
+          </div>
+
+          <div className="flex justify-end space-x-4 pt-4">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-6 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+            >
+              {loading ? 'Booking...' : 'Book Appointment'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+// Repair Shop Directory Component
+const RepairShopDirectory = () => {
+  const [repairShops, setRepairShops] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [zipCode, setZipCode] = useState('');
+  const [selectedShop, setSelectedShop] = useState(null);
+  const [showDetails, setShowDetails] = useState(false);
+  const [showBooking, setShowBooking] = useState(false);
+  const [bookingShop, setBookingShop] = useState(null);
+
+  useEffect(() => {
+    loadRepairShops();
+  }, []);
+
+  const loadRepairShops = async (searchParams = {}) => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams();
+      Object.entries(searchParams).forEach(([key, value]) => {
+        if (value) params.append(key, value);
+      });
+      
+      const response = await axios.get(`${API}/repair-shops/search?${params.toString()}`);
+      setRepairShops(response.data);
+    } catch (error) {
+      console.error('Error loading repair shops:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSearch = () => {
+    const searchParams = {};
+    if (zipCode) searchParams.zip_code = zipCode;
+    if (searchQuery) searchParams.query = searchQuery;
+    loadRepairShops(searchParams);
+  };
+
+  const handleViewDetails = (shop) => {
+    setSelectedShop(shop);
+    setShowDetails(true);
+  };
+
+  const handleBookAppointment = (shop) => {
+    setBookingShop(shop);
+    setShowBooking(true);
+    setShowDetails(false);
+  };
+
+  const handleAppointmentConfirmed = (appointment) => {
+    alert(`Appointment booked successfully! Confirmation ID: ${appointment.id}`);
+  };
+
+  return (
+    <div>
+      {/* Search Section */}
+      <div className="bg-white p-6 rounded-lg shadow-md mb-6">
+        <h3 className="text-lg font-semibold mb-4">Find Repair Shops</h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">ZIP Code</label>
+            <input
+              type="text"
+              placeholder="Enter ZIP code"
+              value={zipCode}
+              onChange={(e) => setZipCode(e.target.value)}
+              className="w-full p-2 border border-gray-300 rounded-md"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Service or Shop Name</label>
+            <input
+              type="text"
+              placeholder="e.g., oil change, brake repair"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full p-2 border border-gray-300 rounded-md"
+            />
+          </div>
+          <div className="flex items-end">
+            <button
+              onClick={handleSearch}
+              className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors duration-200"
+            >
+              Search
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Results */}
+      {loading ? (
+        <div className="flex justify-center items-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {repairShops.length > 0 ? (
+            repairShops.map(shop => (
+              <RepairShopCard
+                key={shop.id}
+                shop={shop}
+                onViewDetails={handleViewDetails}
+                onBookAppointment={handleBookAppointment}
+              />
+            ))
+          ) : (
+            <div className="col-span-full text-center py-12">
+              <div className="text-6xl mb-4">🔧</div>
+              <p className="text-gray-500 text-lg">No repair shops found</p>
+              <p className="text-gray-400 text-sm mt-2">Try adjusting your search criteria</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Modals */}
+      {showDetails && (
+        <RepairShopDetailModal
+          shop={selectedShop}
+          onClose={() => setShowDetails(false)}
+          onBookAppointment={handleBookAppointment}
+        />
+      )}
+
+      {showBooking && (
+        <AppointmentBookingModal
+          shop={bookingShop}
+          onClose={() => setShowBooking(false)}
+          onConfirm={handleAppointmentConfirmed}
+        />
+      )}
+    </div>
+  );
+};
+
 // Enhanced Vehicle Card Component with Image Gallery
 const VehicleCard = ({ vehicle, onViewImages }) => {
   const getDealPulseColor = (rating) => {
