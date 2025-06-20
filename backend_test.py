@@ -139,6 +139,10 @@ def test_create_vehicle():
     success &= assert_field_exists(data, "deal_pulse_rating")
     success &= assert_field_exists(data, "market_price_analysis")
     
+    # Check new image-related fields
+    success &= assert_field_exists(data, "images")
+    success &= assert_field_exists(data, "image_count")
+    
     # Check if VIN matches
     success &= assert_field_equals(data, "vin", TEST_VEHICLE["vin"])
     
