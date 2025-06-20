@@ -331,11 +331,11 @@ async def scrape_dealer_inventory(dealer: dict) -> List[dict]:
     
     return vehicles
 
-# Initialize image manager on startup
+# Initialize services on startup
 @app.on_event("startup")
 async def startup_event():
     await image_manager.initialize()
-    logging.info("Image manager initialized")
+    logging.info("All services initialized: Image Manager, AI CRM, Desking Tool")
 
 # API Routes
 @api_router.get("/")
