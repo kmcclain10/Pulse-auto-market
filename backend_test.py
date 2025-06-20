@@ -39,7 +39,7 @@ TEST_VEHICLE = {
     "drivetrain": "4WD",
     "engine": "3.5L V6",
     "images": ["https://example.com/image1.jpg", "https://example.com/image2.jpg"],
-    "scraped_from_url": "https://example.com/vehicle"
+    "scraped_from_url": "https://www.ford.com/trucks/f150/2013/"
 }
 
 TEST_DEALER = {
