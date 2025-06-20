@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Query
+from fastapi import FastAPI, APIRouter, HTTPException, Query, BackgroundTasks
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -15,6 +15,9 @@ from bs4 import BeautifulSoup
 import re
 import json
 
+# Import our enhanced image service
+from image_service import VehicleImageManager
+
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
@@ -23,13 +26,16 @@ mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
+# Initialize image manager
+image_manager = VehicleImageManager(db)
+
 # Create the main app without a prefix
 app = FastAPI()
 
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
 
-# Vehicle Models
+# Vehicle Models (Enhanced with better image support)
 class Vehicle(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     vin: str
@@ -46,7 +52,8 @@ class Vehicle(BaseModel):
     transmission: Optional[str] = None
     drivetrain: Optional[str] = None
     engine: Optional[str] = None
-    images: List[str] = []
+    images: List[str] = []  # Thumbnail URLs for quick display
+    image_count: int = 0    # Total number of images available
     deal_pulse_rating: Optional[str] = None  # "Great Deal", "Fair Price", "High Price"
     market_price_analysis: Optional[dict] = None
     scraped_from_url: Optional[str] = None
@@ -71,15 +78,11 @@ class VehicleCreate(BaseModel):
     images: List[str] = []
     scraped_from_url: Optional[str] = None
 
-class VehicleSearch(BaseModel):
-    make: Optional[str] = None
-    model: Optional[str] = None
-    year_min: Optional[int] = None
-    year_max: Optional[int] = None
-    price_min: Optional[float] = None
-    price_max: Optional[float] = None
-    mileage_max: Optional[int] = None
-    location: Optional[str] = None
+class VehicleImageResponse(BaseModel):
+    vin: str
+    images: List[dict]
+    total_count: int
+    scraped_at: Optional[datetime] = None
 
 # Dealer Models
 class Dealer(BaseModel):
@@ -90,6 +93,7 @@ class Dealer(BaseModel):
     scraper_adapter: str  # "generic", "carmax", "cargurus", etc.
     last_scraped: Optional[datetime] = None
     vehicle_count: int = 0
+    image_scraping_enabled: bool = True
     active: bool = True
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
@@ -98,6 +102,7 @@ class DealerCreate(BaseModel):
     website_url: str
     location: str
     scraper_adapter: str = "generic"
+    image_scraping_enabled: bool = True
 
 # Scraping Job Models
 class ScrapeJob(BaseModel):
@@ -106,6 +111,7 @@ class ScrapeJob(BaseModel):
     status: str  # "pending", "running", "completed", "failed"
     vehicles_found: int = 0
     vehicles_added: int = 0
+    images_scraped: int = 0
     error_message: Optional[str] = None
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
@@ -212,9 +218,9 @@ def calculate_deal_pulse(vehicle_data: dict, market_data: List[dict]) -> dict:
             "savings": None
         }
 
-# Generic Web Scraper
+# Enhanced scraper with image support
 async def scrape_dealer_inventory(dealer: dict) -> List[dict]:
-    """Generic web scraper for dealer websites"""
+    """Enhanced web scraper for dealer websites with image support"""
     vehicles = []
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
@@ -280,16 +286,17 @@ async def scrape_dealer_inventory(dealer: dict) -> List[dict]:
                             except:
                                 pass
                         
-                        # Extract images
-                        images = []
-                        img_elements = element.find_all('img')
-                        for img in img_elements:
-                            src = img.get('src') or img.get('data-src')
-                            if src and 'vehicle' in src.lower():
-                                images.append(src)
-                        
                         # Get VIN decoded info
                         decoded_info = await decode_vin(vin)
+                        
+                        # Extract detail page URL for image scraping
+                        detail_url = None
+                        link_element = element.find('a')
+                        if link_element and link_element.get('href'):
+                            detail_url = link_element['href']
+                            if not detail_url.startswith('http'):
+                                from urllib.parse import urljoin
+                                detail_url = urljoin(dealer['website_url'], detail_url)
                         
                         vehicle_data = {
                             'vin': vin,
@@ -304,8 +311,8 @@ async def scrape_dealer_inventory(dealer: dict) -> List[dict]:
                             'transmission': decoded_info.get('transmission'),
                             'drivetrain': decoded_info.get('drivetrain'),
                             'engine': decoded_info.get('engine'),
-                            'images': images,
-                            'scraped_from_url': dealer['website_url']
+                            'images': [],  # Will be populated by image scraper
+                            'scraped_from_url': detail_url or dealer['website_url']
                         }
                         
                         if price > 0:  # Only add vehicles with valid price
@@ -320,15 +327,21 @@ async def scrape_dealer_inventory(dealer: dict) -> List[dict]:
     
     return vehicles
 
+# Initialize image manager on startup
+@app.on_event("startup")
+async def startup_event():
+    await image_manager.initialize()
+    logging.info("Image manager initialized")
+
 # API Routes
 @api_router.get("/")
 async def root():
-    return {"message": "Pulse Auto Market API"}
+    return {"message": "Pulse Auto Market API - Enhanced with Image Processing"}
 
 # Vehicle Routes
 @api_router.post("/vehicles", response_model=Vehicle)
-async def create_vehicle(vehicle: VehicleCreate):
-    """Create a new vehicle listing"""
+async def create_vehicle(vehicle: VehicleCreate, background_tasks: BackgroundTasks):
+    """Create a new vehicle listing with image scraping"""
     vehicle_dict = vehicle.dict()
     vehicle_obj = Vehicle(**vehicle_dict)
     
@@ -338,7 +351,18 @@ async def create_vehicle(vehicle: VehicleCreate):
     vehicle_obj.deal_pulse_rating = market_analysis['rating']
     vehicle_obj.market_price_analysis = market_analysis
     
+    # Insert vehicle first
     await db.vehicles.insert_one(vehicle_obj.dict())
+    
+    # Trigger image scraping in background if URL provided
+    if vehicle.scraped_from_url:
+        background_tasks.add_task(
+            image_manager.scrape_and_store_images,
+            vehicle_obj.id,
+            vehicle_obj.vin,
+            vehicle.scraped_from_url
+        )
+    
     return vehicle_obj
 
 @api_router.get("/vehicles", response_model=List[Vehicle])
@@ -391,6 +415,32 @@ async def get_vehicle_by_vin(vin: str):
         raise HTTPException(status_code=404, detail="Vehicle not found")
     return Vehicle(**vehicle)
 
+@api_router.get("/vehicles/{vin}/images", response_model=VehicleImageResponse)
+async def get_vehicle_images(vin: str):
+    """Get all images for a specific vehicle"""
+    images_data = await image_manager.get_vehicle_images(vin)
+    return VehicleImageResponse(**images_data)
+
+@api_router.post("/vehicles/{vin}/scrape-images")
+async def scrape_vehicle_images(vin: str, background_tasks: BackgroundTasks):
+    """Trigger image scraping for a specific vehicle"""
+    vehicle = await db.vehicles.find_one({"vin": vin})
+    if not vehicle:
+        raise HTTPException(status_code=404, detail="Vehicle not found")
+    
+    if not vehicle.get('scraped_from_url'):
+        raise HTTPException(status_code=400, detail="No source URL available for scraping")
+    
+    # Trigger image scraping in background
+    background_tasks.add_task(
+        image_manager.scrape_and_store_images,
+        vehicle['id'],
+        vin,
+        vehicle['scraped_from_url']
+    )
+    
+    return {"message": "Image scraping started", "vin": vin}
+
 @api_router.get("/vehicles/search/makes")
 async def get_available_makes():
     """Get all available vehicle makes"""
@@ -422,10 +472,10 @@ async def get_dealers():
     dealers = await db.dealers.find().to_list(1000)
     return [Dealer(**dealer) for dealer in dealers]
 
-# Scraping Routes
+# Enhanced Scraping Routes with Image Support
 @api_router.post("/scrape/dealer/{dealer_id}")
-async def scrape_dealer(dealer_id: str):
-    """Trigger scraping for a specific dealer"""
+async def scrape_dealer(dealer_id: str, background_tasks: BackgroundTasks):
+    """Trigger scraping for a specific dealer with image support"""
     dealer = await db.dealers.find_one({"id": dealer_id})
     if not dealer:
         raise HTTPException(status_code=404, detail="Dealer not found")
@@ -438,8 +488,10 @@ async def scrape_dealer(dealer_id: str):
         # Scrape vehicles
         vehicles = await scrape_dealer_inventory(dealer)
         
-        # Save vehicles to database
+        # Save vehicles to database and trigger image scraping
         vehicles_added = 0
+        images_scraped = 0
+        
         for vehicle_data in vehicles:
             try:
                 # Check if vehicle already exists
@@ -462,6 +514,18 @@ async def scrape_dealer(dealer_id: str):
                     
                     await db.vehicles.insert_one(vehicle_obj.dict())
                     vehicles_added += 1
+                
+                # Trigger image scraping if enabled and URL available
+                if (dealer.get('image_scraping_enabled', True) and 
+                    vehicle_data.get('scraped_from_url')):
+                    background_tasks.add_task(
+                        image_manager.scrape_and_store_images,
+                        vehicle_data.get('id', str(uuid.uuid4())),
+                        vehicle_data['vin'],
+                        vehicle_data['scraped_from_url']
+                    )
+                    images_scraped += 1
+                    
             except Exception as e:
                 logging.error(f"Error saving vehicle {vehicle_data.get('vin')}: {str(e)}")
         
@@ -479,6 +543,7 @@ async def scrape_dealer(dealer_id: str):
                 "status": "completed",
                 "vehicles_found": len(vehicles),
                 "vehicles_added": vehicles_added,
+                "images_scraped": images_scraped,
                 "completed_at": datetime.utcnow()
             }}
         )
@@ -487,6 +552,7 @@ async def scrape_dealer(dealer_id: str):
             "message": "Scraping completed successfully",
             "vehicles_found": len(vehicles),
             "vehicles_added": vehicles_added,
+            "images_scraped": images_scraped,
             "dealer": dealer['name']
         }
         
@@ -507,11 +573,51 @@ async def get_scrape_jobs():
     jobs = await db.scrape_jobs.find().sort("created_at", -1).to_list(100)
     return [ScrapeJob(**job) for job in jobs]
 
+# Image Management Routes
+@api_router.post("/images/cleanup")
+async def cleanup_expired_images():
+    """Clean up expired images"""
+    cleaned_count = await image_manager.cleanup_expired_images()
+    return {
+        "message": f"Cleaned up {cleaned_count} expired image records",
+        "cleaned_count": cleaned_count
+    }
+
+@api_router.get("/images/stats")
+async def get_image_stats():
+    """Get image storage statistics"""
+    try:
+        total_image_records = await db.vehicle_images.count_documents({})
+        total_vehicles_with_images = await db.vehicles.count_documents({"images": {"$ne": []}})
+        
+        # Get average images per vehicle
+        pipeline = [
+            {"$match": {"images": {"$ne": []}}},
+            {"$project": {"image_count": {"$size": "$images"}}},
+            {"$group": {"_id": None, "avg_images": {"$avg": "$image_count"}}}
+        ]
+        avg_result = await db.vehicle_images.aggregate(pipeline).to_list(1)
+        avg_images = avg_result[0]['avg_images'] if avg_result else 0
+        
+        return {
+            "total_image_records": total_image_records,
+            "vehicles_with_images": total_vehicles_with_images,
+            "average_images_per_vehicle": round(avg_images, 1)
+        }
+    except Exception as e:
+        return {
+            "error": str(e),
+            "total_image_records": 0,
+            "vehicles_with_images": 0,
+            "average_images_per_vehicle": 0
+        }
+
 @api_router.get("/stats")
 async def get_stats():
-    """Get marketplace statistics"""
+    """Get marketplace statistics including image stats"""
     total_vehicles = await db.vehicles.count_documents({})
     total_dealers = await db.dealers.count_documents({})
+    vehicles_with_images = await db.vehicles.count_documents({"images": {"$ne": []}})
     
     # Deal pulse stats
     great_deals = await db.vehicles.count_documents({"deal_pulse_rating": "Great Deal"})
@@ -529,6 +635,8 @@ async def get_stats():
     return {
         "total_vehicles": total_vehicles,
         "total_dealers": total_dealers,
+        "vehicles_with_images": vehicles_with_images,
+        "image_coverage_percentage": round((vehicles_with_images / total_vehicles * 100) if total_vehicles > 0 else 0, 1),
         "deal_pulse_stats": {
             "great_deals": great_deals,
             "fair_prices": fair_prices,
