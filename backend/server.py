@@ -37,6 +37,7 @@ db = client[os.environ['DB_NAME']]
 image_manager = VehicleImageManager(db)
 ai_crm_service = AICRMService(db)
 desking_service = DeskingService(db)
+billing_service = BillingService(db)
 
 # Create the main app without a prefix
 app = FastAPI()
