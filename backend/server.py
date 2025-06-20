@@ -39,6 +39,7 @@ image_manager = VehicleImageManager(db)
 ai_crm_service = AICRMService(db)
 desking_service = DeskingService(db)
 billing_service = BillingService(db)
+repair_shop_service = RepairShopService(db)
 
 # Create the main app without a prefix
 app = FastAPI()
