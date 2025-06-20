@@ -377,6 +377,140 @@ async def create_vehicle(vehicle: VehicleCreate, background_tasks: BackgroundTas
     
     return vehicle_obj
 
+# Repair Shop Directory & Booking System Routes
+@api_router.post("/repair-shops", response_model=RepairShop)
+async def create_repair_shop(shop_data: RepairShopCreate):
+    """Create a new repair shop listing"""
+    try:
+        shop = await repair_shop_service.create_repair_shop(shop_data)
+        return shop
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@api_router.get("/repair-shops/search", response_model=List[RepairShop])
+async def search_repair_shops(
+    zip_code: Optional[str] = Query(None),
+    city: Optional[str] = Query(None),
+    state: Optional[str] = Query(None),
+    query: Optional[str] = Query(None),
+    radius: int = Query(25, le=100)
+):
+    """Search repair shops by location or services"""
+    try:
+        if query:
+            # Text search
+            location = f"{city}, {state}" if city and state else None
+            shops = await repair_shop_service.search_repair_shops(query, location)
+        else:
+            # Location-based search
+            shops = await repair_shop_service.get_repair_shops_by_location(zip_code, city, state, radius)
+        
+        return shops
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/repair-shops/{shop_id}", response_model=RepairShop)
+async def get_repair_shop(shop_id: str):
+    """Get repair shop details by ID"""
+    shop = await repair_shop_service.get_repair_shop_by_id(shop_id)
+    if not shop:
+        raise HTTPException(status_code=404, detail="Repair shop not found")
+    return shop
+
+@api_router.put("/repair-shops/{shop_id}")
+async def update_repair_shop(shop_id: str, updates: dict):
+    """Update repair shop information"""
+    try:
+        success = await repair_shop_service.update_repair_shop(shop_id, updates)
+        if not success:
+            raise HTTPException(status_code=404, detail="Repair shop not found")
+        return {"message": "Repair shop updated successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@api_router.post("/appointments", response_model=Appointment)
+async def create_appointment(appointment_data: AppointmentCreate):
+    """Book a new appointment"""
+    try:
+        appointment = await repair_shop_service.create_appointment(appointment_data)
+        return appointment
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@api_router.get("/repair-shops/{shop_id}/appointments", response_model=List[Appointment])
+async def get_shop_appointments(
+    shop_id: str,
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None)
+):
+    """Get appointments for a repair shop"""
+    try:
+        from datetime import datetime
+        date_from_dt = datetime.fromisoformat(date_from) if date_from else None
+        date_to_dt = datetime.fromisoformat(date_to) if date_to else None
+        
+        appointments = await repair_shop_service.get_shop_appointments(shop_id, date_from_dt, date_to_dt)
+        return appointments
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.put("/appointments/{appointment_id}/status")
+async def update_appointment_status(appointment_id: str, status: AppointmentStatus, notes: str = ""):
+    """Update appointment status"""
+    try:
+        success = await repair_shop_service.update_appointment_status(appointment_id, status, notes)
+        if not success:
+            raise HTTPException(status_code=404, detail="Appointment not found")
+        return {"message": "Appointment status updated", "status": status}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@api_router.get("/repair-shops/{shop_id}/availability")
+async def get_shop_availability(shop_id: str, date: str):
+    """Get available time slots for a specific date"""
+    try:
+        from datetime import datetime
+        appointment_date = datetime.fromisoformat(date)
+        time_slots = await repair_shop_service.get_available_time_slots(shop_id, appointment_date)
+        return {"available_slots": time_slots}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@api_router.post("/repair-shops/{shop_id}/reviews", response_model=Review)
+async def add_shop_review(shop_id: str, review_data: dict):
+    """Add a customer review for a repair shop"""
+    try:
+        review = await repair_shop_service.add_review(shop_id, review_data)
+        return review
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@api_router.get("/repair-shops/{shop_id}/reviews", response_model=List[Review])
+async def get_shop_reviews(shop_id: str, limit: int = Query(10, le=50)):
+    """Get reviews for a repair shop"""
+    reviews = await repair_shop_service.get_shop_reviews(shop_id, limit)
+    return reviews
+
+@api_router.post("/repair-shops/{shop_id}/subscribe")
+async def create_repair_shop_subscription(shop_id: str):
+    """Create $99/month subscription for repair shop"""
+    try:
+        subscription = await repair_shop_service.create_subscription(shop_id)
+        return {
+            "message": "Repair shop subscription created",
+            "subscription_id": subscription.id,
+            "amount": subscription.amount,
+            "trial_end": subscription.trial_end
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@api_router.get("/repair-shops/stats")
+async def get_repair_shop_stats():
+    """Get repair shop marketplace statistics"""
+    stats = await repair_shop_service.get_repair_shop_stats()
+    return stats
+
 @api_router.get("/vehicles", response_model=List[Vehicle])
 async def get_vehicles(
     limit: int = Query(20, le=100),
