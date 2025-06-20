@@ -312,6 +312,9 @@ def test_trigger_scraping():
     success &= assert_field_exists(data, "vehicles_added")
     success &= assert_field_exists(data, "dealer")
     
+    # Check new image-related field
+    success &= assert_field_exists(data, "images_scraped")
+    
     return success
 
 def test_get_scrape_jobs():
