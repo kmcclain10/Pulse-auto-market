@@ -397,6 +397,111 @@ def test_vehicle_filtering():
     
     return success
 
+def test_get_vehicle_images():
+    print_test_header(f"Get Vehicle Images (GET /api/vehicles/{TEST_VIN}/images)")
+    response = requests.get(f"{API_URL}/vehicles/{TEST_VIN}/images")
+    print_response(response)
+    
+    success = True
+    success &= assert_status_code(response, 200)
+    success &= assert_json_response(response)
+    
+    data = response.json()
+    success &= assert_field_exists(data, "vin")
+    success &= assert_field_exists(data, "images")
+    success &= assert_field_exists(data, "total_count")
+    
+    return success
+
+def test_scrape_vehicle_images():
+    print_test_header(f"Scrape Vehicle Images (POST /api/vehicles/{TEST_VIN}/scrape-images)")
+    response = requests.post(f"{API_URL}/vehicles/{TEST_VIN}/scrape-images")
+    print_response(response)
+    
+    # This might return 200 even if AWS credentials are missing
+    # We're testing the API endpoint, not the actual scraping functionality
+    success = True
+    success &= assert_status_code(response, 200)
+    success &= assert_json_response(response)
+    
+    data = response.json()
+    success &= assert_field_exists(data, "message")
+    success &= assert_field_exists(data, "vin")
+    
+    return success
+
+def test_get_image_stats():
+    print_test_header("Get Image Stats (GET /api/images/stats)")
+    response = requests.get(f"{API_URL}/images/stats")
+    print_response(response)
+    
+    success = True
+    success &= assert_status_code(response, 200)
+    success &= assert_json_response(response)
+    
+    data = response.json()
+    success &= assert_field_exists(data, "total_image_records")
+    success &= assert_field_exists(data, "vehicles_with_images")
+    success &= assert_field_exists(data, "average_images_per_vehicle")
+    
+    return success
+
+def test_cleanup_images():
+    print_test_header("Cleanup Images (POST /api/images/cleanup)")
+    response = requests.post(f"{API_URL}/images/cleanup")
+    print_response(response)
+    
+    success = True
+    success &= assert_status_code(response, 200)
+    success &= assert_json_response(response)
+    
+    data = response.json()
+    success &= assert_field_exists(data, "message")
+    success &= assert_field_exists(data, "cleaned_count")
+    
+    return success
+
+def test_enhanced_stats():
+    print_test_header("Enhanced Stats (GET /api/stats)")
+    response = requests.get(f"{API_URL}/stats")
+    print_response(response)
+    
+    success = True
+    success &= assert_status_code(response, 200)
+    success &= assert_json_response(response)
+    
+    data = response.json()
+    success &= assert_field_exists(data, "vehicles_with_images")
+    success &= assert_field_exists(data, "image_coverage_percentage")
+    
+    return success
+
+def test_enhanced_dealer_creation():
+    print_test_header("Enhanced Dealer Creation (POST /api/dealers)")
+    
+    # Create a dealer with image scraping enabled
+    enhanced_dealer = {
+        "name": "Enhanced Test Dealer " + str(uuid.uuid4())[:8],
+        "website_url": "https://www.cargurus.com",
+        "location": "Test City, CA",
+        "scraper_adapter": "generic",
+        "image_scraping_enabled": True
+    }
+    
+    response = requests.post(f"{API_URL}/dealers", json=enhanced_dealer)
+    print_response(response)
+    
+    success = True
+    success &= assert_status_code(response, 200)
+    success &= assert_json_response(response)
+    
+    data = response.json()
+    success &= assert_field_exists(data, "id")
+    success &= assert_field_exists(data, "image_scraping_enabled")
+    success &= assert_field_equals(data, "image_scraping_enabled", True)
+    
+    return success
+
 def run_all_tests():
     test_results = {}
     
@@ -426,6 +531,14 @@ def run_all_tests():
     test_results["Get Scrape Jobs"] = test_get_scrape_jobs()
     test_results["Get Stats"] = test_get_stats()
     test_results["Vehicle Filtering"] = test_vehicle_filtering()
+    
+    # New image-related tests
+    test_results["Get Vehicle Images"] = test_get_vehicle_images()
+    test_results["Scrape Vehicle Images"] = test_scrape_vehicle_images()
+    test_results["Get Image Stats"] = test_get_image_stats()
+    test_results["Cleanup Images"] = test_cleanup_images()
+    test_results["Enhanced Stats"] = test_enhanced_stats()
+    test_results["Enhanced Dealer Creation"] = test_enhanced_dealer_creation()
     
     # Print summary
     print("\n" + "=" * 80)
