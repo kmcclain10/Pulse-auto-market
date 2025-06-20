@@ -3,6 +3,7 @@ from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
+import sys
 import logging
 from pathlib import Path
 from pydantic import BaseModel, Field
@@ -14,6 +15,9 @@ import asyncio
 from bs4 import BeautifulSoup
 import re
 import json
+
+# Add current directory to Python path
+sys.path.append(str(Path(__file__).parent))
 
 # Import our enhanced services
 from image_service import VehicleImageManager
