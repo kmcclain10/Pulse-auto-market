@@ -628,6 +628,13 @@ async def get_stats():
     fair_prices = await db.vehicles.count_documents({"deal_pulse_rating": "Fair Price"})
     high_prices = await db.vehicles.count_documents({"deal_pulse_rating": "High Price"})
     
+    # CRM stats
+    total_leads = await db.leads.count_documents({})
+    hot_leads = await db.leads.count_documents({"lead_score": "hot"})
+    
+    # Desking stats
+    total_deals = await db.deals.count_documents({})
+    
     # Top makes
     pipeline = [
         {"$group": {"_id": "$make", "count": {"$sum": 1}}},
@@ -646,8 +653,181 @@ async def get_stats():
             "fair_prices": fair_prices,
             "high_prices": high_prices
         },
+        "crm_stats": {
+            "total_leads": total_leads,
+            "hot_leads": hot_leads
+        },
+        "desking_stats": {
+            "total_deals": total_deals
+        },
         "top_makes": [{"make": item["_id"], "count": item["count"]} for item in top_makes]
     }
+
+# AI CRM Routes
+@api_router.post("/leads", response_model=Lead)
+async def create_lead(lead_data: dict, background_tasks: BackgroundTasks):
+    """Create a new lead and generate AI response"""
+    try:
+        lead = await ai_crm_service.process_new_lead(lead_data)
+        return lead
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error creating lead: {str(e)}")
+
+@api_router.get("/leads/dealer/{dealer_id}", response_model=List[Lead])
+async def get_dealer_leads(dealer_id: str, status: Optional[LeadStatus] = Query(None), limit: int = Query(50, le=100)):
+    """Get leads for a specific dealer"""
+    leads = await ai_crm_service.get_leads_for_dealer(dealer_id, status, limit)
+    return leads
+
+@api_router.put("/leads/{lead_id}/status")
+async def update_lead_status(lead_id: str, status: LeadStatus, notes: str = ""):
+    """Update lead status"""
+    success = await ai_crm_service.update_lead_status(lead_id, status, notes)
+    if not success:
+        raise HTTPException(status_code=404, detail="Lead not found")
+    return {"message": "Lead status updated", "lead_id": lead_id, "status": status}
+
+@api_router.post("/leads/{lead_id}/approve-response")
+async def approve_ai_response(lead_id: str, approved: bool = True, custom_response: Optional[str] = None):
+    """Approve or modify AI response"""
+    success = await ai_crm_service.approve_ai_response(lead_id, approved, custom_response)
+    if not success:
+        raise HTTPException(status_code=404, detail="Lead not found")
+    return {"message": "AI response approved", "lead_id": lead_id, "approved": approved}
+
+@api_router.get("/leads/{lead_id}/conversation", response_model=List[ConversationMessage])
+async def get_conversation_history(lead_id: str):
+    """Get conversation history for a lead"""
+    # First get the lead to find conversation_id
+    lead_data = await db.leads.find_one({"id": lead_id})
+    if not lead_data:
+        raise HTTPException(status_code=404, detail="Lead not found")
+    
+    conversation = await ai_crm_service.get_conversation_history(lead_data["conversation_id"])
+    return conversation
+
+@api_router.get("/leads/dealer/{dealer_id}/follow-ups")
+async def get_follow_up_suggestions(dealer_id: str):
+    """Get AI-generated follow-up suggestions"""
+    suggestions = await ai_crm_service.generate_follow_up_sequences(dealer_id)
+    return {"follow_up_suggestions": suggestions}
+
+@api_router.get("/crm/dealer/{dealer_id}/stats")
+async def get_dealer_crm_stats(dealer_id: str):
+    """Get CRM statistics for a dealer"""
+    stats = await ai_crm_service.get_dealer_crm_stats(dealer_id)
+    return stats
+
+# Advanced Desking Tool Routes
+@api_router.post("/deals", response_model=DealCalculation)
+async def create_deal(deal_data: dict):
+    """Create a new deal calculation"""
+    try:
+        deal = await desking_service.calculate_deal(deal_data)
+        return deal
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error creating deal: {str(e)}")
+
+@api_router.get("/deals/dealer/{dealer_id}", response_model=List[DealCalculation])
+async def get_dealer_deals(dealer_id: str, limit: int = Query(50, le=100)):
+    """Get deals for a specific dealer"""
+    deals = await desking_service.get_dealer_deals(dealer_id, limit)
+    return deals
+
+@api_router.get("/deals/{deal_id}", response_model=DealCalculation)
+async def get_deal_by_id(deal_id: str):
+    """Get a specific deal by ID"""
+    deal = await desking_service.get_deal_by_id(deal_id)
+    if not deal:
+        raise HTTPException(status_code=404, detail="Deal not found")
+    return deal
+
+@api_router.put("/deals/{deal_id}")
+async def update_deal(deal_id: str, updates: dict):
+    """Update an existing deal"""
+    success = await desking_service.update_deal(deal_id, updates)
+    if not success:
+        raise HTTPException(status_code=404, detail="Deal not found")
+    return {"message": "Deal updated", "deal_id": deal_id}
+
+@api_router.post("/deals/payment-grid", response_model=PaymentGrid)
+async def generate_payment_grid(
+    vehicle_price: float,
+    down_payment: float = 0.0,
+    trade_value: float = 0.0,
+    tax_rate: float = 8.25
+):
+    """Generate payment grid with multiple term/rate combinations"""
+    grid = await desking_service.generate_payment_grid(vehicle_price, down_payment, trade_value, tax_rate)
+    return grid
+
+@api_router.get("/deals/{deal_id}/proposal")
+async def get_deal_proposal(deal_id: str):
+    """Get formatted deal proposal for customer presentation"""
+    proposal = await desking_service.create_deal_proposal(deal_id)
+    if not proposal:
+        raise HTTPException(status_code=404, detail="Deal not found")
+    return proposal
+
+@api_router.get("/fi-products/dealer/{dealer_id}")
+async def get_dealer_fi_products(dealer_id: str, vehicle_price: float, term_months: int = 60):
+    """Get F&I product menu for a dealer"""
+    products = desking_service.create_fi_product_menu(dealer_id, vehicle_price, term_months)
+    return {"products": [product.dict() for product in products]}
+
+@api_router.get("/desking/dealer/{dealer_id}/stats")
+async def get_dealer_fi_stats(dealer_id: str):
+    """Get F&I and desking statistics for a dealer"""
+    stats = await desking_service.get_dealer_fi_stats(dealer_id)
+    return stats
+
+@api_router.post("/deals/calculate-payment")
+async def calculate_payment(
+    principal: float,
+    rate: float,
+    months: int,
+    frequency: str = "monthly"
+):
+    """Calculate loan payment"""
+    from desking_service import PaymentFrequency
+    
+    freq_map = {
+        "monthly": PaymentFrequency.MONTHLY,
+        "biweekly": PaymentFrequency.BIWEEKLY,
+        "weekly": PaymentFrequency.WEEKLY
+    }
+    
+    payment_freq = freq_map.get(frequency, PaymentFrequency.MONTHLY)
+    payment = desking_service.calculate_finance_payment(principal, rate, months, payment_freq)
+    
+    return {
+        "principal": principal,
+        "rate": rate,
+        "months": months,
+        "frequency": frequency,
+        "payment": payment
+    }
+
+# Vehicle inquiry endpoint (triggers AI CRM)
+@api_router.post("/vehicles/{vin}/inquire")
+async def create_vehicle_inquiry(vin: str, inquiry_data: dict, background_tasks: BackgroundTasks):
+    """Create a vehicle inquiry (triggers AI CRM response)"""
+    try:
+        # Add VIN to inquiry data
+        inquiry_data["vehicle_vin"] = vin
+        
+        # Process through AI CRM
+        lead = await ai_crm_service.process_new_lead(inquiry_data)
+        
+        return {
+            "message": "Inquiry received and processed",
+            "lead_id": lead.id,
+            "ai_response_generated": True,
+            "lead_score": lead.lead_score,
+            "inquiry_type": lead.inquiry_type
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error processing inquiry: {str(e)}")
 
 # Include the router in the main app
 app.include_router(api_router)
