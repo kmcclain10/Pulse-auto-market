@@ -172,6 +172,10 @@ def test_get_vehicles():
         success &= assert_field_exists(vehicle, "model")
         success &= assert_field_exists(vehicle, "year")
         success &= assert_field_exists(vehicle, "price")
+        
+        # Check new image-related fields
+        success &= assert_field_exists(vehicle, "images")
+        success &= assert_field_exists(vehicle, "image_count")
     
     return success
 
