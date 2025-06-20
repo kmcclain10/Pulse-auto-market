@@ -24,6 +24,7 @@ from image_service import VehicleImageManager
 from ai_crm_service import AICRMService, Lead, LeadStatus, LeadScore, InquiryType, ConversationMessage
 from desking_service import DeskingService, DealCalculation, DealType, PaymentGrid, FIProduct, TradeIn, TaxInfo, FinanceTerms, LeaseTerms
 from billing_service import BillingService, Subscription, SubscriptionPlan, SubscriptionStatus, PaymentHistory, CreateSubscriptionRequest, UpdateSubscriptionRequest
+from repair_shop_service import RepairShopService, RepairShop, Appointment, Review, ServiceCategory, AppointmentStatus, RepairShopCreate, AppointmentCreate
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
