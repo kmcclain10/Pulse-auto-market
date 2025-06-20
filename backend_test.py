@@ -93,10 +93,16 @@ def assert_field_equals(data, field, expected_value):
     return False
 
 def assert_field_type(data, field, expected_type):
-    if field in data and isinstance(data[field], expected_type):
+    if field == "":
+        if isinstance(data, expected_type):
+            print(f"✅ Response is of type {expected_type.__name__}")
+            return True
+        print(f"❌ Response is not of type {expected_type.__name__}, got {type(data).__name__}")
+        return False
+    elif field in data and isinstance(data[field], expected_type):
         print(f"✅ Field '{field}' is of type {expected_type.__name__}")
         return True
-    print(f"❌ Field '{field}' is not of type {expected_type.__name__}, got {type(data.get(field)).__name__}")
+    print(f"❌ Field '{field}' is not of type {expected_type.__name__}, got {type(data.get(field, None)).__name__}")
     return False
 
 # Test functions
