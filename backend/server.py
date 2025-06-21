@@ -10,6 +10,15 @@ from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 import uuid
 from datetime import datetime
+import json
+from bson import ObjectId
+
+# Custom JSON encoder to handle MongoDB ObjectId
+class JSONEncoder(json.JSONEncoder):
+    def default(self, o):
+        if isinstance(o, ObjectId):
+            return str(o)
+        return super().default(o)
 
 # Import our scraper modules
 from backend.scraper.advanced_scraper import AdvancedCarScraper
