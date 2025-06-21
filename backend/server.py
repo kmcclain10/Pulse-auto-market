@@ -832,27 +832,45 @@ def generate_purchase_agreement_pdf(deal_data: Dict) -> str:
     
     # Customer Information
     customer = deal_data.get('customer', {})
+    # Handle both dict and object access patterns
+    first_name = customer.get('first_name', '') if isinstance(customer, dict) else getattr(customer, 'first_name', '')
+    last_name = customer.get('last_name', '') if isinstance(customer, dict) else getattr(customer, 'last_name', '')
+    address = customer.get('address', '') if isinstance(customer, dict) else getattr(customer, 'address', '')
+    city = customer.get('city', '') if isinstance(customer, dict) else getattr(customer, 'city', '')
+    state = customer.get('state', '') if isinstance(customer, dict) else getattr(customer, 'state', '')
+    zip_code = customer.get('zip_code', '') if isinstance(customer, dict) else getattr(customer, 'zip_code', '')
+    phone = customer.get('phone', '') if isinstance(customer, dict) else getattr(customer, 'phone', '')
+    
     customer_info = f"""
     <b>PURCHASER INFORMATION:</b><br/>
-    Name: {customer.get('first_name', '')} {customer.get('last_name', '')}<br/>
-    Address: {customer.get('address', '')}<br/>
-    City, State: {customer.get('city', '')}, {customer.get('state', '')}<br/>
-    ZIP: {customer.get('zip_code', '')}<br/>
-    Phone: {customer.get('phone', '')}
+    Name: {first_name} {last_name}<br/>
+    Address: {address}<br/>
+    City, State: {city}, {state}<br/>
+    ZIP: {zip_code}<br/>
+    Phone: {phone}
     """
     story.append(Paragraph(customer_info, styles['Normal']))
     story.append(Spacer(1, 12))
     
     # Vehicle Information
     vehicle = deal_data.get('vehicle', {})
+    # Handle both dict and object access patterns
+    year = vehicle.get('year', '') if isinstance(vehicle, dict) else getattr(vehicle, 'year', '')
+    make = vehicle.get('make', '') if isinstance(vehicle, dict) else getattr(vehicle, 'make', '')
+    model = vehicle.get('model', '') if isinstance(vehicle, dict) else getattr(vehicle, 'model', '')
+    vin = vehicle.get('vin', '') if isinstance(vehicle, dict) else getattr(vehicle, 'vin', '')
+    mileage = vehicle.get('mileage', 0) if isinstance(vehicle, dict) else getattr(vehicle, 'mileage', 0)
+    condition = vehicle.get('condition', '') if isinstance(vehicle, dict) else getattr(vehicle, 'condition', '')
+    selling_price = vehicle.get('selling_price', 0) if isinstance(vehicle, dict) else getattr(vehicle, 'selling_price', 0)
+    
     vehicle_info = f"""
     <b>VEHICLE INFORMATION:</b><br/>
-    Year: {vehicle.get('year', '')}<br/>
-    Make: {vehicle.get('make', '')}<br/>
-    Model: {vehicle.get('model', '')}<br/>
-    VIN: {vehicle.get('vin', '')}<br/>
-    Mileage: {vehicle.get('mileage', 0):,}<br/>
-    Condition: {vehicle.get('condition', '').title()}
+    Year: {year}<br/>
+    Make: {make}<br/>
+    Model: {model}<br/>
+    VIN: {vin}<br/>
+    Mileage: {mileage:,}<br/>
+    Condition: {condition.title() if condition else ''}
     """
     story.append(Paragraph(vehicle_info, styles['Normal']))
     story.append(Spacer(1, 12))
@@ -860,7 +878,7 @@ def generate_purchase_agreement_pdf(deal_data: Dict) -> str:
     # Pricing Table
     pricing_data = [
         ['ITEM', 'AMOUNT'],
-        ['Vehicle Price', f"${vehicle.get('selling_price', 0):,.2f}"],
+        ['Vehicle Price', f"${selling_price:,.2f}"],
         ['Trade-in Value', f"${deal_data.get('trade_in_value', 0):,.2f}"],
         ['Sales Tax', f"${deal_data.get('sales_tax', 0):,.2f}"],
         ['Title Fee', f"${deal_data.get('title_fee', 0):,.2f}"],
