@@ -260,13 +260,16 @@ frontend:
     implemented: true
     working: false
     file: "/app/frontend/src/App.js"
-    stuck_count: 0
+    stuck_count: 1
     priority: "high"
     needs_retesting: false
     status_history:
       - working: false
         agent: "testing"
         comment: "Vehicle photos are not real dealer photos as requested. All images are base64-encoded placeholder images. Each vehicle is labeled as 'This is a test vehicle X from [dealer URL]' which indicates these are test/placeholder images rather than real dealer lot photos. No dealer lot backgrounds, specific dealership signage, or authentic dealer photo quality is visible."
+      - working: false
+        agent: "testing"
+        comment: "After additional testing, the vehicle photos are still SVG placeholders with 'No Image Available' text. The API responses show that the photos are SVG placeholders, not real JPEG photos from dealer websites. The dealer names are showing as 'Test Dealer from [URL]' rather than proper dealer names like 'Memory Motors TN'. No Acura vehicles were found in the inventory. The backend scraper appears to be configured correctly to download real photos in real_dealer_scraper.py, but the actual implementation is still using placeholders."
 
 metadata:
   created_by: "main_agent"
