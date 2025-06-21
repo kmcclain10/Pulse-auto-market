@@ -12,8 +12,8 @@ import uuid
 from datetime import datetime
 
 # Import our scraper modules
-from scraper.advanced_scraper import AdvancedCarScraper
-from scraper.models import Vehicle, ScrapingJob
+from backend.scraper.advanced_scraper import AdvancedCarScraper
+from backend.scraper.models import Vehicle, ScrapingJob
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
