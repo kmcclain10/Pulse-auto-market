@@ -270,6 +270,9 @@ frontend:
       - working: false
         agent: "testing"
         comment: "After additional testing, the vehicle photos are still SVG placeholders with 'No Image Available' text. The API responses show that the photos are SVG placeholders, not real JPEG photos from dealer websites. The dealer names are showing as 'Test Dealer from [URL]' rather than proper dealer names like 'Memory Motors TN'. No Acura vehicles were found in the inventory. The backend scraper appears to be configured correctly to download real photos in real_dealer_scraper.py, but the actual implementation is still using placeholders."
+      - working: false
+        agent: "testing"
+        comment: "Found the root cause: The real dealer scraper is failing because Playwright is not properly installed. The backend logs show the error: 'Executable doesn't exist at /root/.cache/ms-playwright/chromium-1091/chrome-linux/chrome'. This means the Playwright browser binaries are missing, so the scraper cannot navigate to dealer websites to extract real photos. The system is falling back to placeholder images instead."
 
 metadata:
   created_by: "main_agent"
