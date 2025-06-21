@@ -185,15 +185,18 @@ backend:
 
   - task: "Document Generation"
     implemented: true
-    working: false
+    working: true
     file: "/app/backend/server.py"
-    stuck_count: 1
+    stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
         - working: false
           agent: "testing"
           comment: "Document generation endpoint returns a 400 error with the message: 'dict' object has no attribute 'get('first_name', '')'. There appears to be an issue with accessing nested customer data in the document generation functions."
+        - working: true
+          agent: "testing"
+          comment: "Fixed the document generation functions to handle both dictionary and object access patterns. The issue was that the functions were trying to use the get() method on objects that might not be dictionaries. Modified all document generation functions to check the type of the object before accessing attributes."
 
   - task: "Complete Enterprise Workflow"
     implemented: true
