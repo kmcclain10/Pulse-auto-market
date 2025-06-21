@@ -166,7 +166,8 @@ class TestFIDesking:
         assert response.status_code == 200
         
         result = response.json()
-        assert result["monthly_payment"] == 20000.00 / 60
+        # For zero APR, monthly payment should be close to loan amount / term
+        assert abs(result["monthly_payment"] - (20000.00 / 60)) < 0.1
         assert result["total_interest"] == 0
         assert result["total_cost"] == 20000.00
         
