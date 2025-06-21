@@ -499,6 +499,290 @@ class TestFIDesking:
         print(f"Total Deal Amount: ${final_deal['total_deal_amount']:.2f}")
         print(f"Monthly Payment: ${final_deal['finance_terms']['monthly_payment']:.2f}")
         print("--------------------")
+    
+    def test_document_generation(self):
+        """Test document generation with fixed ObjectId serialization"""
+        # Create a new deal for document testing
+        deal_data = {
+            "customer": test_enterprise_customer,
+            "vehicle": test_enterprise_vehicle,
+            "salesperson": "Document Test Agent"
+        }
+        
+        response = requests.post(f"{BACKEND_URL}/deals", json=deal_data)
+        assert response.status_code == 200
+        
+        TestFIDesking.enterprise_deal_id = response.json()["id"]
+        deal_id = TestFIDesking.enterprise_deal_id
+        
+        # Add finance terms to the deal
+        finance_data = {
+            "loan_amount": 40000.00,
+            "apr": 4.99,
+            "term_months": 60,
+            "down_payment": 5000.00
+        }
+        
+        response = requests.post(f"{BACKEND_URL}/deals/{deal_id}/finance", json=finance_data)
+        assert response.status_code == 200
+        
+        # Generate documents
+        document_request = {
+            "document_types": [
+                "purchase_agreement",
+                "odometer_disclosure",
+                "truth_in_lending",
+                "bill_of_sale"
+            ]
+        }
+        
+        response = requests.post(f"{BACKEND_URL}/deals/{deal_id}/documents/generate", json=document_request)
+        assert response.status_code == 200
+        
+        result = response.json()
+        assert "documents" in result
+        assert len(result["documents"]) == 4
+        
+        # Save a document ID for later testing
+        TestFIDesking.document_id = result["documents"][0]["id"]
+        
+        print(f"✅ Document generation test passed - Generated {len(result['documents'])} documents")
+        
+        # Verify documents were added to the deal
+        response = requests.get(f"{BACKEND_URL}/deals/{deal_id}")
+        assert response.status_code == 200
+        
+        deal = response.json()
+        assert len(deal["documents"]) >= 4
+        assert deal["docs_generated"] is True
+        
+        print("✅ Document association with deal test passed")
+    
+    def test_get_documents(self):
+        """Test retrieving documents for a deal"""
+        assert TestFIDesking.enterprise_deal_id is not None, "Enterprise deal ID not set"
+        
+        response = requests.get(f"{BACKEND_URL}/deals/{TestFIDesking.enterprise_deal_id}/documents")
+        assert response.status_code == 200
+        
+        documents = response.json()
+        assert isinstance(documents, list)
+        assert len(documents) > 0
+        
+        # Verify document structure
+        doc = documents[0]
+        assert "id" in doc
+        assert "title" in doc
+        assert "document_type" in doc
+        assert "status" in doc
+        assert "pdf_content" in doc
+        
+        print(f"✅ Get documents test passed - Found {len(documents)} documents")
+    
+    def test_get_document_pdf(self):
+        """Test retrieving PDF content of a document"""
+        assert TestFIDesking.document_id is not None, "Document ID not set"
+        
+        response = requests.get(f"{BACKEND_URL}/documents/{TestFIDesking.document_id}/pdf")
+        assert response.status_code == 200
+        
+        result = response.json()
+        assert "pdf_content" in result
+        assert result["pdf_content"] is not None
+        assert len(result["pdf_content"]) > 0
+        
+        # Verify it's a valid base64 encoded PDF
+        try:
+            pdf_bytes = base64.b64decode(result["pdf_content"])
+            assert pdf_bytes[:4] == b'%PDF'  # PDF magic number
+            print("✅ PDF content validation passed")
+        except Exception as e:
+            assert False, f"Invalid PDF content: {str(e)}"
+        
+        print("✅ Get document PDF test passed")
+    
+    def test_enterprise_workflow(self):
+        """Test the complete enterprise workflow with all components"""
+        # Create a new deal for the enterprise workflow
+        deal_data = {
+            "customer": {
+                "first_name": "Enterprise",
+                "last_name": "Customer",
+                "email": "enterprise@example.com",
+                "phone": "555-123-9876",
+                "address": "789 Enterprise Ave",
+                "city": "New York",
+                "state": "NY",
+                "zip_code": "10001",
+                "ssn_last_four": "5678",
+                "credit_score": 780
+            },
+            "vehicle": {
+                "vin": "WAUYGAFC1CN123456",
+                "year": 2023,
+                "make": "Audi",
+                "model": "A6",
+                "trim": "Premium Plus",
+                "condition": "new",
+                "mileage": 50,
+                "msrp": 58000.00,
+                "invoice_price": 54000.00,
+                "selling_price": 56000.00
+            },
+            "salesperson": "Enterprise Agent"
+        }
+        
+        response = requests.post(f"{BACKEND_URL}/deals", json=deal_data)
+        assert response.status_code == 200
+        
+        deal_id = response.json()["id"]
+        
+        # Step 1: Add finance terms
+        finance_data = {
+            "loan_amount": 50000.00,
+            "apr": 3.99,
+            "term_months": 60,
+            "down_payment": 6000.00
+        }
+        
+        response = requests.post(f"{BACKEND_URL}/deals/{deal_id}/finance", json=finance_data)
+        assert response.status_code == 200
+        
+        # Step 2: Create credit application
+        credit_app_data = {
+            "ssn": "123-45-6789",
+            "date_of_birth": "1975-05-15T00:00:00.000Z",
+            "employment_status": "employed",
+            "employer_name": "Enterprise Corp",
+            "monthly_income": 9500.00,
+            "housing_status": "own",
+            "monthly_housing_payment": 2500.00,
+            "requested_amount": 50000.00,
+            "requested_term": 60,
+            "down_payment": 6000.00
+        }
+        
+        response = requests.post(f"{BACKEND_URL}/deals/{deal_id}/credit-application", json=credit_app_data)
+        assert response.status_code == 200
+        
+        credit_app = response.json()
+        assert credit_app["deal_id"] == deal_id
+        
+        # Step 3: Submit to lenders
+        lender_response = requests.get(f"{BACKEND_URL}/lenders")
+        assert lender_response.status_code == 200
+        
+        lenders = lender_response.json()
+        lender_ids = [lender["id"] for lender in lenders[:2]]  # Submit to first two lenders
+        
+        submission_data = {
+            "lender_ids": lender_ids,
+            "loan_amount": 50000.00,
+            "loan_term": 60
+        }
+        
+        response = requests.post(f"{BACKEND_URL}/deals/{deal_id}/submit-to-lenders", json=submission_data)
+        assert response.status_code == 200
+        
+        submission_result = response.json()
+        assert "submissions" in submission_result
+        assert len(submission_result["submissions"]) == 2
+        
+        # Step 4: Select F&I products
+        menu_response = requests.get(f"{BACKEND_URL}/deals/{deal_id}/menu")
+        assert menu_response.status_code == 200
+        
+        menu = menu_response.json()
+        
+        # Find Premium 60 months VSC
+        vsc_id = None
+        for vsc in menu["vsc_options"]:
+            if vsc["coverage_type"] == "premium" and vsc["term"] == "60_months":
+                vsc_id = vsc["id"]
+                break
+        
+        assert vsc_id is not None
+        
+        selection_data = {
+            "deal_id": deal_id,
+            "selected_vsc_id": vsc_id,
+            "include_gap": True
+        }
+        
+        response = requests.post(f"{BACKEND_URL}/deals/{deal_id}/menu-selection", json=selection_data)
+        assert response.status_code == 200
+        
+        # Step 5: Generate documents
+        document_request = {
+            "document_types": [
+                "purchase_agreement",
+                "odometer_disclosure",
+                "truth_in_lending",
+                "bill_of_sale"
+            ]
+        }
+        
+        response = requests.post(f"{BACKEND_URL}/deals/{deal_id}/documents/generate", json=document_request)
+        assert response.status_code == 200
+        
+        doc_result = response.json()
+        assert "documents" in doc_result
+        assert len(doc_result["documents"]) == 4
+        
+        # Step 6: Verify all components are integrated
+        response = requests.get(f"{BACKEND_URL}/deals/{deal_id}")
+        assert response.status_code == 200
+        
+        final_deal = response.json()
+        
+        # Verify all components are present
+        assert final_deal["finance_terms"] is not None
+        assert len(final_deal["documents"]) >= 4
+        assert final_deal["docs_generated"] is True
+        assert final_deal["selected_vsc"] == vsc_id
+        assert final_deal["gap_option"] is not None
+        
+        # Get lender responses
+        response = requests.get(f"{BACKEND_URL}/deals/{deal_id}/lender-responses")
+        assert response.status_code == 200
+        
+        lender_responses = response.json()
+        assert len(lender_responses) == 2
+        
+        # Get documents
+        response = requests.get(f"{BACKEND_URL}/deals/{deal_id}/documents")
+        assert response.status_code == 200
+        
+        documents = response.json()
+        assert len(documents) >= 4
+        
+        # Verify PDF content for each document
+        for doc in documents[:2]:  # Test first two documents
+            response = requests.get(f"{BACKEND_URL}/documents/{doc['id']}/pdf")
+            assert response.status_code == 200
+            
+            pdf_result = response.json()
+            assert "pdf_content" in pdf_result
+            assert pdf_result["pdf_content"] is not None
+            assert len(pdf_result["pdf_content"]) > 0
+            
+            # Verify it's a valid base64 encoded PDF
+            try:
+                pdf_bytes = base64.b64decode(pdf_result["pdf_content"])
+                assert pdf_bytes[:4] == b'%PDF'  # PDF magic number
+            except Exception as e:
+                assert False, f"Invalid PDF content for document {doc['title']}: {str(e)}"
+        
+        print("✅ Complete enterprise workflow integration test passed")
+        print("\n--- Enterprise Deal Summary ---")
+        print(f"Customer: {final_deal['customer']['first_name']} {final_deal['customer']['last_name']}")
+        print(f"Vehicle: {final_deal['vehicle']['year']} {final_deal['vehicle']['make']} {final_deal['vehicle']['model']}")
+        print(f"Selling Price: ${final_deal['vehicle']['selling_price']:.2f}")
+        print(f"F&I Products: ${final_deal['total_fi_products']:.2f}")
+        print(f"Total Deal Amount: ${final_deal['total_deal_amount']:.2f}")
+        print(f"Documents Generated: {len(documents)}")
+        print(f"Lender Submissions: {len(lender_responses)}")
+        print("-----------------------------")
 
 
 # Run the tests
