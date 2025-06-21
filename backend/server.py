@@ -472,6 +472,9 @@ async def get_status_checks():
     return [{"message": "Legacy endpoint - use /deals instead"}]
 
 
+# Include the router in the main app
+app.include_router(api_router)
+
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
