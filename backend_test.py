@@ -804,6 +804,16 @@ if __name__ == "__main__":
         test.test_menu_selection()
         test.test_complete_deal_flow()
         
+        # Document generation tests
+        print("\n--- Testing Document Generation ---")
+        test.test_document_generation()
+        test.test_get_documents()
+        test.test_get_document_pdf()
+        
+        # Complete enterprise workflow test
+        print("\n--- Testing Complete Enterprise Workflow ---")
+        test.test_enterprise_workflow()
+        
         print("\n✅ All tests passed successfully!")
     except Exception as e:
         print(f"\n❌ Test failed: {str(e)}")
