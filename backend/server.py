@@ -1328,9 +1328,16 @@ async def generate_deal_documents(deal_id: str, request: DocumentGenerationReque
     """Generate documents for a deal"""
     try:
         # Get deal data
-        deal = await db.deals.find_one({"id": deal_id})
+        deal = db.deals.find_one({"id": deal_id})
         if not deal:
             raise HTTPException(status_code=404, detail="Deal not found")
+        
+        # Convert MongoDB document to dict and handle ObjectId
+        deal_dict = {}
+        for key, value in deal.items():
+            if key == '_id':
+                continue
+            deal_dict[key] = value
         
         generated_docs = []
         
@@ -1339,20 +1346,20 @@ async def generate_deal_documents(deal_id: str, request: DocumentGenerationReque
             title = ""
             
             if doc_type == "purchase_agreement":
-                pdf_content = generate_purchase_agreement_pdf(deal)
+                pdf_content = generate_purchase_agreement_pdf(deal_dict)
                 title = "Motor Vehicle Purchase Agreement"
             elif doc_type == "odometer_disclosure":
-                pdf_content = generate_odometer_disclosure_pdf(deal)
+                pdf_content = generate_odometer_disclosure_pdf(deal_dict)
                 title = "Federal Odometer Disclosure Statement"
             elif doc_type == "truth_in_lending":
-                pdf_content = generate_truth_in_lending_pdf(deal)
+                pdf_content = generate_truth_in_lending_pdf(deal_dict)
                 title = "Truth-in-Lending Disclosure Statement"
             elif doc_type == "bill_of_sale":
-                pdf_content = generate_bill_of_sale_pdf(deal)
+                pdf_content = generate_bill_of_sale_pdf(deal_dict)
                 title = "Motor Vehicle Bill of Sale"
             else:
                 # Default document
-                pdf_content = generate_purchase_agreement_pdf(deal)
+                pdf_content = generate_purchase_agreement_pdf(deal_dict)
                 title = f"{doc_type.replace('_', ' ').title()}"
             
             doc = GeneratedDocument(
