@@ -1147,21 +1147,36 @@ def generate_truth_in_lending_pdf(deal_data: Dict) -> str:
     
     # Customer Information
     customer = deal_data.get('customer', {})
+    # Handle both dict and object access patterns
+    first_name = customer.get('first_name', '') if isinstance(customer, dict) else getattr(customer, 'first_name', '')
+    last_name = customer.get('last_name', '') if isinstance(customer, dict) else getattr(customer, 'last_name', '')
+    address = customer.get('address', '') if isinstance(customer, dict) else getattr(customer, 'address', '')
+    city = customer.get('city', '') if isinstance(customer, dict) else getattr(customer, 'city', '')
+    state = customer.get('state', '') if isinstance(customer, dict) else getattr(customer, 'state', '')
+    zip_code = customer.get('zip_code', '') if isinstance(customer, dict) else getattr(customer, 'zip_code', '')
+    
     customer_info = f"""
-    <b>CUSTOMER:</b> {customer.get('first_name', '')} {customer.get('last_name', '')}<br/>
-    <b>ADDRESS:</b> {customer.get('address', '')}, {customer.get('city', '')}, {customer.get('state', '')} {customer.get('zip_code', '')}
+    <b>CUSTOMER:</b> {first_name} {last_name}<br/>
+    <b>ADDRESS:</b> {address}, {city}, {state} {zip_code}
     """
     story.append(Paragraph(customer_info, styles['Normal']))
     story.append(Spacer(1, 12))
     
     # Finance terms
     finance_terms = deal_data.get('finance_terms', {})
+    # Handle both dict and object access patterns
+    apr = finance_terms.get('apr', 0) if isinstance(finance_terms, dict) else getattr(finance_terms, 'apr', 0)
+    total_interest = finance_terms.get('total_interest', 0) if isinstance(finance_terms, dict) else getattr(finance_terms, 'total_interest', 0)
+    loan_amount = finance_terms.get('loan_amount', 0) if isinstance(finance_terms, dict) else getattr(finance_terms, 'loan_amount', 0)
+    total_cost = finance_terms.get('total_cost', 0) if isinstance(finance_terms, dict) else getattr(finance_terms, 'total_cost', 0)
+    term_months = finance_terms.get('term_months', 0) if isinstance(finance_terms, dict) else getattr(finance_terms, 'term_months', 0)
+    monthly_payment = finance_terms.get('monthly_payment', 0) if isinstance(finance_terms, dict) else getattr(finance_terms, 'monthly_payment', 0)
     
     # TILA Box
     tila_data = [
         ['ANNUAL PERCENTAGE RATE', 'FINANCE CHARGE', 'AMOUNT FINANCED', 'TOTAL OF PAYMENTS'],
-        [f"{finance_terms.get('apr', 0)}%", f"${finance_terms.get('total_interest', 0):,.2f}", 
-         f"${finance_terms.get('loan_amount', 0):,.2f}", f"${finance_terms.get('total_cost', 0):,.2f}"],
+        [f"{apr}%", f"${total_interest:,.2f}", 
+         f"${loan_amount:,.2f}", f"${total_cost:,.2f}"],
         ['The cost of your credit as a yearly rate', 'The dollar amount the credit will cost you', 
          'The amount of credit provided to you', 'The amount you will have paid after making all payments']
     ]
@@ -1187,8 +1202,8 @@ def generate_truth_in_lending_pdf(deal_data: Dict) -> str:
     # Payment schedule
     payment_info = f"""
     <b>PAYMENT SCHEDULE:</b><br/>
-    Number of Payments: {finance_terms.get('term_months', 0)}<br/>
-    Amount of Payments: ${finance_terms.get('monthly_payment', 0):,.2f}<br/>
+    Number of Payments: {term_months}<br/>
+    Amount of Payments: ${monthly_payment:,.2f}<br/>
     When Payments are Due: Monthly beginning 30 days from date of this contract
     """
     story.append(Paragraph(payment_info, styles['Normal']))
@@ -1196,8 +1211,13 @@ def generate_truth_in_lending_pdf(deal_data: Dict) -> str:
     
     # Security interest
     vehicle = deal_data.get('vehicle', {})
+    # Handle both dict and object access patterns
+    year = vehicle.get('year', '') if isinstance(vehicle, dict) else getattr(vehicle, 'year', '')
+    make = vehicle.get('make', '') if isinstance(vehicle, dict) else getattr(vehicle, 'make', '')
+    model = vehicle.get('model', '') if isinstance(vehicle, dict) else getattr(vehicle, 'model', '')
+    
     security_info = f"""
-    <b>SECURITY:</b> You are giving a security interest in the {vehicle.get('year', '')} {vehicle.get('make', '')} {vehicle.get('model', '')} being purchased.
+    <b>SECURITY:</b> You are giving a security interest in the {year} {make} {model} being purchased.
     """
     story.append(Paragraph(security_info, styles['Normal']))
     story.append(Spacer(1, 24))
