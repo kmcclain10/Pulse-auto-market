@@ -170,6 +170,54 @@ class DocumentStatus(str, Enum):
     SIGNED = "signed"
     FINALIZED = "finalized"
 
+class LeadSource(str, Enum):
+    WEBSITE = "website"
+    PHONE = "phone"
+    WALK_IN = "walk_in"
+    REFERRAL = "referral"
+    SOCIAL_MEDIA = "social_media"
+    EMAIL = "email"
+    ADVERTISING = "advertising"
+
+class LeadStatus(str, Enum):
+    NEW = "new"
+    CONTACTED = "contacted"
+    QUALIFIED = "qualified"
+    APPOINTMENT_SET = "appointment_set"
+    SHOWED = "showed"
+    NO_SHOW = "no_show"
+    SOLD = "sold"
+    LOST = "lost"
+
+class CommunicationType(str, Enum):
+    EMAIL = "email"
+    SMS = "sms"
+    PHONE = "phone"
+    CHAT = "chat"
+    IN_PERSON = "in_person"
+
+class CommunicationStatus(str, Enum):
+    SENT = "sent"
+    DELIVERED = "delivered"
+    OPENED = "opened"
+    CLICKED = "clicked"
+    REPLIED = "replied"
+    FAILED = "failed"
+
+class TaskType(str, Enum):
+    FOLLOW_UP = "follow_up"
+    APPOINTMENT = "appointment"
+    CALL = "call"
+    EMAIL = "email"
+    DEMO = "demo"
+    PAPERWORK = "paperwork"
+
+class TaskStatus(str, Enum):
+    PENDING = "pending"
+    IN_PROGRESS = "in_progress"
+    COMPLETED = "completed"
+    CANCELLED = "cancelled"
+
 
 # Vehicle Models
 class Vehicle(BaseModel):
