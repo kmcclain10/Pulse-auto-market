@@ -51,6 +51,10 @@ mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
+# OpenAI configuration
+openai.api_key = os.environ.get('OPENAI_API_KEY')
+openai_client = openai.AsyncOpenAI(api_key=os.environ.get('OPENAI_API_KEY'))
+
 # Create the main app without a prefix
 app = FastAPI(title="Dealer Management System", version="1.0.0")
 
