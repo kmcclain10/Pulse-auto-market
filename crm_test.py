@@ -350,14 +350,14 @@ class TestAICRM:
         assert response.status_code == 200
         
         dashboard = response.json()
-        assert "lead_count" in dashboard
-        assert "communication_count" in dashboard
-        assert "task_count" in dashboard
+        assert "total_leads" in dashboard
+        assert "new_leads" in dashboard
+        assert "qualified_leads" in dashboard
         assert "conversion_rate" in dashboard
-        assert "lead_sources" in dashboard
-        assert "recent_activities" in dashboard
+        assert "recent_communications" in dashboard
+        assert "pending_tasks" in dashboard
         
-        print(f"✅ Get dashboard analytics test passed - {dashboard['lead_count']} leads, {dashboard['communication_count']} communications")
+        print(f"✅ Get dashboard analytics test passed - {dashboard['total_leads']} leads, {dashboard['recent_communications']} communications")
     
     def test_complete_ai_crm_workflow(self):
         """Test complete AI CRM workflow"""
