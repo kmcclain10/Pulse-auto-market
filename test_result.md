@@ -246,12 +246,11 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Deal Creation API"
-    - "Deal Management"
-    - "Finance Calculator"
-    - "Finance Integration"
-    - "F&I Menu System"
-    - "Menu Selection"
+    - "Dashboard"
+    - "Deal Creation Form"
+    - "Deal Details Page"
+    - "Finance Calculator Component"
+    - "F&I Menu Selling Interface"
   stuck_tasks: []
   test_all: true
   test_priority: "high_first"
