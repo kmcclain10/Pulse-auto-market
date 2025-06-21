@@ -26,12 +26,89 @@ import json
 from datetime import timedelta
 
 # Import CRM models
-from crm_models import (
-    Lead, Communication, Task, CommunicationTemplate, 
-    CommunicationSequence, AIAgent, CampaignModel,
-    LeadSource, LeadStatus, CommunicationType, CommunicationStatus,
-    TaskType, TaskStatus
-)
+# from crm_models import (
+#     Lead, Communication, Task, CommunicationTemplate, 
+#     CommunicationSequence, AIAgent, CampaignModel,
+#     LeadSource, LeadStatus, CommunicationType, CommunicationStatus,
+#     TaskType, TaskStatus
+# )
+
+# CRM Models - Direct definition
+class Lead(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    first_name: str
+    last_name: str
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    address: Optional[str] = None
+    city: Optional[str] = None
+    state: Optional[str] = None
+    zip_code: Optional[str] = None
+    source: str = "website"
+    status: str = "new"
+    score: int = 0
+    interested_vehicles: List[str] = []
+    budget_min: Optional[float] = None
+    budget_max: Optional[float] = None
+    assigned_salesperson: Optional[str] = None
+    last_contacted: Optional[datetime] = None
+    next_follow_up: Optional[datetime] = None
+    preferred_contact_method: str = "email"
+    ai_notes: Optional[str] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    converted_deal_id: Optional[str] = None
+
+class Communication(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    lead_id: Optional[str] = None
+    customer_id: Optional[str] = None
+    deal_id: Optional[str] = None
+    type: str = "email"
+    direction: str = "outbound"
+    subject: Optional[str] = None
+    content: str
+    from_email: Optional[str] = None
+    to_email: Optional[str] = None
+    from_phone: Optional[str] = None
+    to_phone: Optional[str] = None
+    staff_member: Optional[str] = None
+    status: str = "sent"
+    is_ai_generated: bool = False
+    ai_model: Optional[str] = None
+    sentiment: Optional[str] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+class Task(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    title: str
+    description: Optional[str] = None
+    type: str = "follow_up"
+    priority: str = "medium"
+    status: str = "pending"
+    lead_id: Optional[str] = None
+    customer_id: Optional[str] = None
+    deal_id: Optional[str] = None
+    assigned_to: Optional[str] = None
+    created_by: Optional[str] = None
+    due_date: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    is_ai_generated: bool = False
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+class AIAgent(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    type: str = "communicator"
+    description: str
+    model: str = "gpt-4"
+    system_prompt: str
+    temperature: float = 0.7
+    max_tokens: int = 1000
+    is_active: bool = True
+    total_interactions: int = 0
+    created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
 # Custom ObjectId handler for Pydantic
