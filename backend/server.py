@@ -20,6 +20,10 @@ from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib import colors
 from reportlab.lib.units import inch
 from bson import ObjectId
+import openai
+import asyncio
+import json
+from datetime import timedelta
 
 
 # Custom ObjectId handler for Pydantic
