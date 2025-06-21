@@ -91,6 +91,63 @@ test_enterprise_vehicle = {
     "selling_price": 45000.00
 }
 
+# Test data for CRM
+test_lead_high_quality = {
+    "first_name": "John",
+    "last_name": "Customer",
+    "email": "john@example.com",
+    "phone": "555-123-4567",
+    "address": "123 Main St",
+    "city": "Los Angeles",
+    "state": "CA",
+    "zip_code": "90001",
+    "source": "website",
+    "status": "new",
+    "interested_vehicles": ["BMW X5", "Audi Q7"],
+    "budget_min": 50000.00,
+    "budget_max": 80000.00,
+    "preferred_contact_method": "email"
+}
+
+test_lead_medium_quality = {
+    "first_name": "Sarah",
+    "last_name": "Johnson",
+    "email": "sarah@example.com",
+    "phone": "555-987-6543",
+    "city": "Chicago",
+    "state": "IL",
+    "source": "social_media",
+    "status": "new",
+    "interested_vehicles": ["Honda Accord"],
+    "budget_min": 25000.00,
+    "budget_max": 35000.00
+}
+
+test_lead_low_quality = {
+    "first_name": "Anonymous",
+    "last_name": "User",
+    "email": "anon@example.com",
+    "source": "website",
+    "status": "new"
+}
+
+test_communication = {
+    "type": "email",
+    "direction": "outbound",
+    "subject": "Vehicle Information",
+    "content": "Thank you for your interest in our vehicles. Here is the information you requested.",
+    "to_email": "customer@example.com",
+    "staff_member": "Jane Doe"
+}
+
+test_task = {
+    "title": "Follow up with customer",
+    "description": "Call customer to discuss vehicle options",
+    "type": "follow_up",
+    "priority": "high",
+    "due_date": (datetime.utcnow() + timedelta(days=1)).isoformat()
+}
+
 # Test class for F&I Desking Tool API
 class TestFIDesking:
     deal_id = None
