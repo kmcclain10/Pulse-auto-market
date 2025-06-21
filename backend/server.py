@@ -1,15 +1,19 @@
-from fastapi import FastAPI, APIRouter
+from fastapi import FastAPI, APIRouter, HTTPException, BackgroundTasks
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
+import asyncio
 from pathlib import Path
 from pydantic import BaseModel, Field
-from typing import List
+from typing import List, Optional, Dict, Any
 import uuid
 from datetime import datetime
 
+# Import our scraper modules
+from scraper.advanced_scraper import AdvancedCarScraper
+from scraper.models import Vehicle, ScrapingJob
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -25,6 +29,8 @@ app = FastAPI()
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
 
+# Initialize the scraper
+scraper = AdvancedCarScraper()
 
 # Define Models
 class StatusCheck(BaseModel):
@@ -35,10 +41,19 @@ class StatusCheck(BaseModel):
 class StatusCheckCreate(BaseModel):
     client_name: str
 
-# Add your routes to the router instead of directly to app
+class ScrapingRequest(BaseModel):
+    dealer_urls: List[str]
+    max_vehicles_per_dealer: Optional[int] = 100
+
+class ScrapingResponse(BaseModel):
+    job_id: str
+    status: str
+    message: str
+
+# Existing routes
 @api_router.get("/")
 async def root():
-    return {"message": "Hello World"}
+    return {"message": "Pulse Auto Market - Advanced Car Scraper API"}
 
 @api_router.post("/status", response_model=StatusCheck)
 async def create_status_check(input: StatusCheckCreate):
@@ -51,6 +66,184 @@ async def create_status_check(input: StatusCheckCreate):
 async def get_status_checks():
     status_checks = await db.status_checks.find().to_list(1000)
     return [StatusCheck(**status_check) for status_check in status_checks]
+
+# New Scraping Routes
+@api_router.post("/scrape/start", response_model=ScrapingResponse)
+async def start_scraping(request: ScrapingRequest, background_tasks: BackgroundTasks):
+    """Start scraping multiple dealer websites"""
+    job_id = str(uuid.uuid4())
+    
+    # Create scraping job record
+    job = ScrapingJob(
+        id=job_id,
+        dealer_urls=request.dealer_urls,
+        status="starting",
+        max_vehicles_per_dealer=request.max_vehicles_per_dealer,
+        created_at=datetime.utcnow()
+    )
+    
+    await db.scraping_jobs.insert_one(job.dict())
+    
+    # Start background scraping task
+    background_tasks.add_task(run_scraping_job, job_id, request.dealer_urls, request.max_vehicles_per_dealer)
+    
+    return ScrapingResponse(
+        job_id=job_id,
+        status="started",
+        message=f"Scraping job started for {len(request.dealer_urls)} dealers"
+    )
+
+@api_router.get("/scrape/status/{job_id}")
+async def get_scraping_status(job_id: str):
+    """Get status of a scraping job"""
+    job = await db.scraping_jobs.find_one({"id": job_id})
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    
+    # Get vehicle count for this job
+    vehicle_count = await db.vehicles.count_documents({"scraping_job_id": job_id})
+    
+    return {
+        "job_id": job_id,
+        "status": job["status"],
+        "progress": job.get("progress", 0),
+        "vehicles_scraped": vehicle_count,
+        "dealers_completed": job.get("dealers_completed", 0),
+        "total_dealers": len(job["dealer_urls"]),
+        "created_at": job["created_at"],
+        "updated_at": job.get("updated_at"),
+        "error_message": job.get("error_message")
+    }
+
+@api_router.get("/scrape/jobs")
+async def get_scraping_jobs():
+    """Get all scraping jobs"""
+    jobs = await db.scraping_jobs.find().sort("created_at", -1).to_list(50)
+    return jobs
+
+@api_router.get("/vehicles")
+async def get_vehicles(limit: int = 50, skip: int = 0, dealer_url: Optional[str] = None):
+    """Get scraped vehicles with optional filtering"""
+    query = {}
+    if dealer_url:
+        query["dealer_url"] = dealer_url
+    
+    vehicles = await db.vehicles.find(query).sort("scraped_at", -1).skip(skip).limit(limit).to_list(limit)
+    total_count = await db.vehicles.count_documents(query)
+    
+    return {
+        "vehicles": vehicles,
+        "total": total_count,
+        "limit": limit,
+        "skip": skip
+    }
+
+@api_router.get("/vehicles/{vehicle_id}")
+async def get_vehicle(vehicle_id: str):
+    """Get single vehicle by ID"""
+    vehicle = await db.vehicles.find_one({"id": vehicle_id})
+    if not vehicle:
+        raise HTTPException(status_code=404, detail="Vehicle not found")
+    return vehicle
+
+@api_router.delete("/vehicles/{vehicle_id}")
+async def delete_vehicle(vehicle_id: str):
+    """Delete a vehicle"""
+    result = await db.vehicles.delete_one({"id": vehicle_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Vehicle not found")
+    return {"message": "Vehicle deleted successfully"}
+
+@api_router.get("/dealers/stats")
+async def get_dealer_stats():
+    """Get statistics about scraped dealers"""
+    pipeline = [
+        {"$group": {
+            "_id": "$dealer_url",
+            "vehicle_count": {"$sum": 1},
+            "last_scraped": {"$max": "$scraped_at"},
+            "dealer_name": {"$first": "$dealer_name"}
+        }},
+        {"$sort": {"vehicle_count": -1}}
+    ]
+    
+    stats = await db.vehicles.aggregate(pipeline).to_list(100)
+    return stats
+
+# Background task function
+async def run_scraping_job(job_id: str, dealer_urls: List[str], max_vehicles_per_dealer: int):
+    """Background task to run the scraping job"""
+    try:
+        # Update job status
+        await db.scraping_jobs.update_one(
+            {"id": job_id},
+            {"$set": {"status": "running", "updated_at": datetime.utcnow()}}
+        )
+        
+        total_dealers = len(dealer_urls)
+        dealers_completed = 0
+        total_vehicles_scraped = 0
+        
+        for dealer_url in dealer_urls:
+            try:
+                logger.info(f"Starting to scrape dealer: {dealer_url}")
+                
+                # Scrape this dealer
+                vehicles = await scraper.scrape_dealer(dealer_url, max_vehicles_per_dealer)
+                
+                # Save vehicles to database
+                for vehicle in vehicles:
+                    vehicle_dict = vehicle.dict()
+                    vehicle_dict["scraping_job_id"] = job_id
+                    await db.vehicles.insert_one(vehicle_dict)
+                
+                dealers_completed += 1
+                total_vehicles_scraped += len(vehicles)
+                
+                # Update progress
+                progress = int((dealers_completed / total_dealers) * 100)
+                await db.scraping_jobs.update_one(
+                    {"id": job_id},
+                    {"$set": {
+                        "progress": progress,
+                        "dealers_completed": dealers_completed,
+                        "updated_at": datetime.utcnow()
+                    }}
+                )
+                
+                logger.info(f"Completed scraping {dealer_url}: {len(vehicles)} vehicles")
+                
+                # Add delay between dealers to be respectful
+                await asyncio.sleep(5)
+                
+            except Exception as e:
+                logger.error(f"Error scraping dealer {dealer_url}: {str(e)}")
+                continue
+        
+        # Mark job as completed
+        await db.scraping_jobs.update_one(
+            {"id": job_id},
+            {"$set": {
+                "status": "completed",
+                "progress": 100,
+                "dealers_completed": dealers_completed,
+                "total_vehicles_scraped": total_vehicles_scraped,
+                "updated_at": datetime.utcnow()
+            }}
+        )
+        
+        logger.info(f"Scraping job {job_id} completed: {total_vehicles_scraped} vehicles from {dealers_completed} dealers")
+        
+    except Exception as e:
+        logger.error(f"Scraping job {job_id} failed: {str(e)}")
+        await db.scraping_jobs.update_one(
+            {"id": job_id},
+            {"$set": {
+                "status": "failed",
+                "error_message": str(e),
+                "updated_at": datetime.utcnow()
+            }}
+        )
 
 # Include the router in the main app
 app.include_router(api_router)
