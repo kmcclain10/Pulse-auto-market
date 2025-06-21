@@ -208,7 +208,7 @@ class TestEnterpriseFeatures:
         document_types = ["purchase_agreement", "odometer_disclosure", "truth_in_lending", "bill_of_sale"]
         
         response = requests.post(f"{BACKEND_URL}/deals/{TestEnterpriseFeatures.deal_id}/documents/generate", 
-                                json=document_types)
+                                json={"document_types": document_types})
         print(f"Document generation response: {response.status_code}")
         print(f"Response content: {response.text}")
         assert response.status_code == 200
