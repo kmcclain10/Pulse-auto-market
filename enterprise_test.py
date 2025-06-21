@@ -412,7 +412,7 @@ class TestEnterpriseFeatures:
         document_types = ["purchase_agreement", "odometer_disclosure", "truth_in_lending", "bill_of_sale"]
         
         response = requests.post(f"{BACKEND_URL}/deals/{TestEnterpriseFeatures.enterprise_deal_id}/documents/generate", 
-                                json=document_types)
+                                json={"document_types": document_types})
         assert response.status_code == 200
         generated_docs = response.json()["documents"]
         assert len(generated_docs) == len(document_types)
