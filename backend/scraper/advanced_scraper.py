@@ -3,6 +3,7 @@ import logging
 import random
 import re
 import base64
+import uuid
 from typing import List, Optional, Dict, Any
 from urllib.parse import urljoin, urlparse
 from datetime import datetime
