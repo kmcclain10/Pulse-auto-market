@@ -1328,7 +1328,7 @@ async def generate_deal_documents(deal_id: str, request: DocumentGenerationReque
     """Generate documents for a deal"""
     try:
         # Get deal data
-        deal = db.deals.find_one({"id": deal_id})
+        deal = await db.deals.find_one({"id": deal_id})
         if not deal:
             raise HTTPException(status_code=404, detail="Deal not found")
         
