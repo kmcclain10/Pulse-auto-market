@@ -537,6 +537,9 @@ class TestFIDesking:
         }
         
         response = requests.post(f"{BACKEND_URL}/deals/{deal_id}/documents/generate", json=document_request)
+        print(f"Document generation response: {response.status_code}")
+        print(f"Response content: {response.text}")
+        
         assert response.status_code == 200
         
         result = response.json()
