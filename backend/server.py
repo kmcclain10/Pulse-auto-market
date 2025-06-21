@@ -1077,13 +1077,20 @@ def generate_odometer_disclosure_pdf(deal_data: Dict) -> str:
     
     # Vehicle Information
     vehicle = deal_data.get('vehicle', {})
+    # Handle both dict and object access patterns
+    year = vehicle.get('year', '') if isinstance(vehicle, dict) else getattr(vehicle, 'year', '')
+    make = vehicle.get('make', '') if isinstance(vehicle, dict) else getattr(vehicle, 'make', '')
+    model = vehicle.get('model', '') if isinstance(vehicle, dict) else getattr(vehicle, 'model', '')
+    vin = vehicle.get('vin', '') if isinstance(vehicle, dict) else getattr(vehicle, 'vin', '')
+    mileage = vehicle.get('mileage', 0) if isinstance(vehicle, dict) else getattr(vehicle, 'mileage', 0)
+    
     vehicle_info = f"""
     <b>VEHICLE IDENTIFICATION:</b><br/>
-    Year: {vehicle.get('year', '')}<br/>
-    Make: {vehicle.get('make', '')}<br/>
-    Model: {vehicle.get('model', '')}<br/>
+    Year: {year}<br/>
+    Make: {make}<br/>
+    Model: {model}<br/>
     Body Type: Sedan<br/>
-    Vehicle Identification Number: {vehicle.get('vin', '')}
+    Vehicle Identification Number: {vin}
     """
     story.append(Paragraph(vehicle_info, styles['Normal']))
     story.append(Spacer(1, 12))
@@ -1091,7 +1098,7 @@ def generate_odometer_disclosure_pdf(deal_data: Dict) -> str:
     # Odometer Reading
     odometer_info = f"""
     <b>ODOMETER DISCLOSURE:</b><br/>
-    I state that the odometer now reads: <b>{vehicle.get('mileage', 0):,} miles</b><br/><br/>
+    I state that the odometer now reads: <b>{mileage:,} miles</b><br/><br/>
     (Check one box only):<br/>
     ☑ I hereby certify that to the best of my knowledge the odometer reading reflects the actual mileage of the vehicle.<br/>
     ☐ I hereby certify that to the best of my knowledge the odometer reading reflects the amount of mileage in excess of its mechanical limits.<br/>
