@@ -92,6 +92,11 @@ test_enterprise_vehicle = {
 # Test class for F&I Desking Tool API
 class TestFIDesking:
     deal_id = None
+    enterprise_deal_id = None
+    document_id = None
+    form_id = None
+    credit_app_id = None
+    signature_request_id = None
     
     def test_root_endpoint(self):
         """Test the root endpoint"""
