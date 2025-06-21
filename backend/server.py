@@ -128,6 +128,10 @@ async def get_scraping_status(job_id: str):
 async def get_scraping_jobs():
     """Get all scraping jobs"""
     jobs = await db.scraping_jobs.find().sort("created_at", -1).to_list(50)
+    # Convert ObjectId to string
+    for job in jobs:
+        if "_id" in job:
+            job["_id"] = str(job["_id"])
     return jobs
 
 @api_router.get("/vehicles")
