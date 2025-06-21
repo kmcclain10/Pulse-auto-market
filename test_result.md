@@ -342,9 +342,8 @@ metadata:
 
 test_plan:
   current_focus: 
-    - "Document Generation"
-  stuck_tasks:
-    - "Document Generation"
+    - "AI Communication CRM System"
+  stuck_tasks: []
   test_all: false
   test_priority: "high_first"
 
