@@ -1319,8 +1319,11 @@ async def update_form(form_id: str, form_data: dict):
         raise HTTPException(status_code=400, detail=str(e))
 
 # Document Generation Endpoints
+class DocumentGenerationRequest(BaseModel):
+    document_types: List[str]
+
 @api_router.post("/deals/{deal_id}/documents/generate")
-async def generate_deal_documents(deal_id: str, document_types: List[str]):
+async def generate_deal_documents(deal_id: str, request: DocumentGenerationRequest):
     """Generate documents for a deal"""
     try:
         # Get deal data
@@ -1330,7 +1333,7 @@ async def generate_deal_documents(deal_id: str, document_types: List[str]):
         
         generated_docs = []
         
-        for doc_type in document_types:
+        for doc_type in request.document_types:
             pdf_content = None
             title = ""
             
