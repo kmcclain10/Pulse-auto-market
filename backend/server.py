@@ -826,6 +826,140 @@ def generate_purchase_agreement_pdf(deal_data: Dict) -> str:
     
     # Return base64 encoded PDF
     return base64.b64encode(pdf_bytes).decode('utf-8')
+
+# AI Communication Functions
+async def generate_ai_response(prompt: str, context: Dict[str, Any], response_type: str = "email") -> str:
+    """Generate AI-powered communication response using OpenAI"""
+    try:
+        # Build system prompt based on response type
+        if response_type == "email":
+            system_prompt = """You are a professional automotive sales communication expert. 
+            Generate personalized, engaging email responses that are:
+            - Friendly and professional
+            - Focused on helping the customer
+            - Action-oriented
+            - Compliant with automotive sales best practices
+            - Avoid being pushy or aggressive
+            
+            Always include:
+            - Personalized greeting
+            - Value proposition
+            - Clear next steps
+            - Professional signature placeholder
+            """
+        elif response_type == "sms":
+            system_prompt = """You are an automotive sales SMS expert. Generate brief, professional SMS messages that are:
+            - Under 160 characters when possible
+            - Friendly but professional
+            - Include clear call-to-action
+            - Compliant with SMS marketing regulations
+            - Never pushy or spam-like
+            """
+        else:
+            system_prompt = "You are a helpful automotive sales assistant."
+        
+        # Add context to the prompt
+        full_prompt = f"""
+        Context: {json.dumps(context, default=str)}
+        
+        Request: {prompt}
+        
+        Generate a professional {response_type} response.
+        """
+        
+        response = await openai_client.chat.completions.create(
+            model="gpt-4",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": full_prompt}
+            ],
+            temperature=0.7,
+            max_tokens=500
+        )
+        
+        return response.choices[0].message.content
+        
+    except Exception as e:
+        print(f"OpenAI API error: {str(e)}")
+        return f"Thank you for your interest! We'll get back to you shortly. Please call us at (555) 123-4567 for immediate assistance."
+
+async def analyze_lead_score(lead_data: Dict[str, Any]) -> int:
+    """Use AI to score lead quality (0-100)"""
+    try:
+        prompt = f"""
+        Analyze this automotive lead and provide a score from 0-100 based on:
+        - Budget alignment
+        - Contact information completeness
+        - Buying timeline indicators
+        - Communication responsiveness
+        
+        Lead data: {json.dumps(lead_data, default=str)}
+        
+        Respond with only a number between 0-100.
+        """
+        
+        response = await openai_client.chat.completions.create(
+            model="gpt-4",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.3,
+            max_tokens=10
+        )
+        
+        score = int(response.choices[0].message.content.strip())
+        return min(100, max(0, score))
+        
+    except Exception as e:
+        print(f"Lead scoring error: {str(e)}")
+        return 50  # Default middle score
+
+async def generate_communication_insights(communications: List[Dict]) -> str:
+    """Generate AI insights about communication patterns"""
+    try:
+        prompt = f"""
+        Analyze these customer communications and provide insights about:
+        - Customer engagement level
+        - Buying signals
+        - Best times to follow up
+        - Recommended next actions
+        
+        Communications: {json.dumps(communications[:5], default=str)}  # Limit context
+        
+        Provide 2-3 actionable insights in bullet points.
+        """
+        
+        response = await openai_client.chat.completions.create(
+            model="gpt-4",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.5,
+            max_tokens=200
+        )
+        
+        return response.choices[0].message.content
+        
+    except Exception as e:
+        print(f"Communication insights error: {str(e)}")
+        return "Continue regular follow-up and maintain professional communication."
+
+async def auto_respond_to_inquiry(inquiry: str, lead_data: Dict[str, Any]) -> str:
+    """Generate automatic response to customer inquiry"""
+    context = {
+        "customer_name": f"{lead_data.get('first_name', '')} {lead_data.get('last_name', '')}",
+        "inquiry": inquiry,
+        "dealership": "ABC Motors",
+        "phone": "(555) 123-4567"
+    }
+    
+    prompt = f"""
+    A customer has sent this inquiry: "{inquiry}"
+    
+    Generate a helpful, professional response that:
+    - Acknowledges their inquiry
+    - Provides relevant information
+    - Invites them to continue the conversation
+    - Includes contact information
+    """
+    
+    return await generate_ai_response(prompt, context, "email")
 def generate_odometer_disclosure_pdf(deal_data: Dict) -> str:
     """Generate Odometer Disclosure Statement PDF"""
     buffer = io.BytesIO()
