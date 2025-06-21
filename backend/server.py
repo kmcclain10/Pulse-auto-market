@@ -144,6 +144,11 @@ async def get_vehicles(limit: int = 50, skip: int = 0, dealer_url: Optional[str]
     vehicles = await db.vehicles.find(query).sort("scraped_at", -1).skip(skip).limit(limit).to_list(limit)
     total_count = await db.vehicles.count_documents(query)
     
+    # Convert ObjectId to string
+    for vehicle in vehicles:
+        if "_id" in vehicle:
+            vehicle["_id"] = str(vehicle["_id"])
+    
     return {
         "vehicles": vehicles,
         "total": total_count,
