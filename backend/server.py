@@ -1331,23 +1331,40 @@ async def generate_deal_documents(deal_id: str, document_types: List[str]):
         generated_docs = []
         
         for doc_type in document_types:
+            pdf_content = None
+            title = ""
+            
             if doc_type == "purchase_agreement":
-                # Generate Purchase Agreement PDF
                 pdf_content = generate_purchase_agreement_pdf(deal)
-                
-                doc = GeneratedDocument(
-                    deal_id=deal_id,
-                    template_id="purchase_agreement_template",
-                    document_type="purchase_agreement",
-                    title="Motor Vehicle Purchase Agreement",
-                    generated_content="<p>Purchase Agreement Generated</p>",
-                    pdf_content=pdf_content,
-                    variables_used=deal,
-                    status=DocumentStatus.GENERATED
-                )
-                
-                await db.documents.insert_one(doc.dict())
-                generated_docs.append(doc)
+                title = "Motor Vehicle Purchase Agreement"
+            elif doc_type == "odometer_disclosure":
+                pdf_content = generate_odometer_disclosure_pdf(deal)
+                title = "Federal Odometer Disclosure Statement"
+            elif doc_type == "truth_in_lending":
+                pdf_content = generate_truth_in_lending_pdf(deal)
+                title = "Truth-in-Lending Disclosure Statement"
+            elif doc_type == "bill_of_sale":
+                pdf_content = generate_bill_of_sale_pdf(deal)
+                title = "Motor Vehicle Bill of Sale"
+            else:
+                # Default document
+                pdf_content = generate_purchase_agreement_pdf(deal)
+                title = f"{doc_type.replace('_', ' ').title()}"
+            
+            doc = GeneratedDocument(
+                deal_id=deal_id,
+                template_id=f"{doc_type}_template",
+                document_type=doc_type,
+                title=title,
+                generated_content=f"<p>{title} Generated</p>",
+                pdf_content=pdf_content,
+                variables_used=deal,
+                status=DocumentStatus.GENERATED,
+                signature_required=True
+            )
+            
+            await db.documents.insert_one(doc.dict())
+            generated_docs.append(doc)
         
         # Update deal
         doc_ids = [doc.id for doc in generated_docs]
