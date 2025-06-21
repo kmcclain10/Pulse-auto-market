@@ -6,6 +6,7 @@ const Navbar = () => {
 
   const isActive = (path) => location.pathname === path;
   const isDealsActive = () => location.pathname.includes('/deal/');
+  const isCRMActive = () => location.pathname.includes('/crm');
 
   return (
     <nav className="bg-slate-900 text-white shadow-lg">
@@ -24,8 +25,20 @@ const Navbar = () => {
                     : 'text-gray-300 hover:bg-gray-700 hover:text-white'
                 }`}
               >
-                Dashboard
+                F&I Dashboard
               </Link>
+              
+              <Link
+                to="/crm"
+                className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                  isCRMActive() 
+                    ? 'bg-purple-600 text-white' 
+                    : 'text-gray-300 hover:bg-gray-700 hover:text-white'
+                }`}
+              >
+                🤖 AI CRM
+              </Link>
+              
               <Link
                 to="/deal/new"
                 className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
@@ -76,15 +89,37 @@ const Navbar = () => {
                   </div>
                 </div>
               )}
+
+              {/* CRM Tools Dropdown */}
+              {isCRMActive() && (
+                <div className="flex space-x-2">
+                  <span className="text-gray-400">•</span>
+                  <div className="flex space-x-2">
+                    <span className="text-purple-400 text-sm">CRM Tools:</span>
+                    <Link
+                      to="/crm/leads"
+                      className="text-gray-300 hover:text-white text-sm"
+                    >
+                      Leads
+                    </Link>
+                    <Link
+                      to="/crm/communications"
+                      className="text-gray-300 hover:text-white text-sm"
+                    >
+                      Communications
+                    </Link>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
           <div className="flex items-center space-x-4">
             <div className="text-right">
-              <div className="text-sm text-gray-400">Enterprise F&I Platform</div>
-              <div className="text-xs text-gray-500">Complete Desking Solution</div>
+              <div className="text-sm text-gray-400">Enterprise F&I + AI CRM</div>
+              <div className="text-xs text-gray-500">Complete Dealership Solution</div>
             </div>
-            <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
-              <span className="text-sm font-semibold">FM</span>
+            <div className="w-8 h-8 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full flex items-center justify-center">
+              <span className="text-sm font-semibold">AI</span>
             </div>
           </div>
         </div>
