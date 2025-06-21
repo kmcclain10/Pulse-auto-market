@@ -21,7 +21,7 @@ class JSONEncoder(json.JSONEncoder):
         return super().default(o)
 
 # Import our scraper modules
-from backend.scraper.dealercarsearch_scraper import DealerCarSearchScraper as AdvancedCarScraper
+from backend.scraper.real_dealer_scraper import RealDealerScraper as AdvancedCarScraper
 from backend.scraper.models import Vehicle, ScrapingJob
 
 ROOT_DIR = Path(__file__).parent
