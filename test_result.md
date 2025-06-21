@@ -258,3 +258,5 @@ test_plan:
 agent_communication:
     - agent: "testing"
       message: "Completed comprehensive testing of all backend API endpoints. Created and executed tests for Deal Creation, Deal Management, Finance Calculator, Finance Integration, F&I Menu System, and Menu Selection. All tests passed successfully. The backend API is working as expected with proper calculations for taxes, finance terms, VSC options, and GAP insurance."
+    - agent: "testing"
+      message: "Starting comprehensive testing of the frontend components. Will test Dashboard, Deal Creation Form, Deal Details Page, Finance Calculator Component, and F&I Menu Selling Interface."
