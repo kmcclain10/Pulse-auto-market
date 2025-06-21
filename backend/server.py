@@ -11,6 +11,14 @@ import uuid
 from datetime import datetime
 from decimal import Decimal
 from enum import Enum
+import base64
+import io
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import letter
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib import colors
+from reportlab.lib.units import inch
 
 
 ROOT_DIR = Path(__file__).parent
