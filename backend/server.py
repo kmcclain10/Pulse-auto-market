@@ -25,6 +25,14 @@ import asyncio
 import json
 from datetime import timedelta
 
+# Import CRM models
+from crm_models import (
+    Lead, Communication, Task, CommunicationTemplate, 
+    CommunicationSequence, AIAgent, CampaignModel,
+    LeadSource, LeadStatus, CommunicationType, CommunicationStatus,
+    TaskType, TaskStatus
+)
+
 
 # Custom ObjectId handler for Pydantic
 class PyObjectId(ObjectId):
