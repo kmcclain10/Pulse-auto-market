@@ -1019,14 +1019,424 @@ async def get_deal_menu(deal_id: str):
     }
 
 
-# Old endpoints for backward compatibility
-@api_router.post("/status", response_model=dict)
-async def create_status_check(input: dict):
-    return {"message": "Legacy endpoint - use /deals instead"}
+# Forms Management Endpoints
+@api_router.get("/forms/templates", response_model=List[dict])
+async def get_form_templates(state: str = "CA"):
+    """Get all form templates for a specific state"""
+    templates = initialize_form_templates()
+    state_requirements = get_state_form_requirements(state)
+    
+    # Filter templates based on state requirements
+    filtered_templates = {}
+    for form_type in state_requirements["required_forms"]:
+        if form_type in templates:
+            filtered_templates[form_type.value] = {
+                "form_type": form_type.value,
+                "title": templates[form_type]["title"],
+                "description": templates[form_type]["description"],
+                "fields": templates[form_type]["fields"],
+                "required": True
+            }
+    
+    return list(filtered_templates.values())
 
-@api_router.get("/status", response_model=List[dict])
-async def get_status_checks():
-    return [{"message": "Legacy endpoint - use /deals instead"}]
+@api_router.get("/forms/requirements/{state}")
+async def get_state_requirements(state: str):
+    """Get form requirements for a specific state"""
+    return get_state_form_requirements(state)
+
+@api_router.post("/deals/{deal_id}/forms")
+async def create_deal_form(deal_id: str, form_data: dict):
+    """Create a form for a deal"""
+    try:
+        # Get deal
+        deal = await db.deals.find_one({"id": deal_id})
+        if not deal:
+            raise HTTPException(status_code=404, detail="Deal not found")
+        
+        # Create form
+        form = FormData(
+            deal_id=deal_id,
+            form_template_id=form_data.get("template_id"),
+            form_type=FormType(form_data.get("form_type")),
+            field_values=form_data.get("field_values", {}),
+            status=FormStatus.DRAFT
+        )
+        
+        # Save form
+        await db.forms.insert_one(form.dict())
+        
+        # Update deal with form ID
+        await db.deals.update_one(
+            {"id": deal_id},
+            {"$addToSet": {"forms": form.id}, "$set": {"updated_at": datetime.utcnow()}}
+        )
+        
+        return form
+        
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@api_router.get("/deals/{deal_id}/forms")
+async def get_deal_forms(deal_id: str):
+    """Get all forms for a deal"""
+    forms = await db.forms.find({"deal_id": deal_id}).to_list(100)
+    return [FormData(**form) for form in forms]
+
+@api_router.put("/forms/{form_id}")
+async def update_form(form_id: str, form_data: dict):
+    """Update form data"""
+    try:
+        update_data = {
+            "field_values": form_data.get("field_values", {}),
+            "status": form_data.get("status", FormStatus.DRAFT),
+            "updated_at": datetime.utcnow()
+        }
+        
+        result = await db.forms.update_one({"id": form_id}, {"$set": update_data})
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail="Form not found")
+        
+        return {"message": "Form updated successfully"}
+        
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+# Document Generation Endpoints
+@api_router.post("/deals/{deal_id}/documents/generate")
+async def generate_deal_documents(deal_id: str, document_types: List[str]):
+    """Generate documents for a deal"""
+    try:
+        # Get deal data
+        deal = await db.deals.find_one({"id": deal_id})
+        if not deal:
+            raise HTTPException(status_code=404, detail="Deal not found")
+        
+        generated_docs = []
+        
+        for doc_type in document_types:
+            if doc_type == "purchase_agreement":
+                # Generate Purchase Agreement PDF
+                pdf_content = generate_purchase_agreement_pdf(deal)
+                
+                doc = GeneratedDocument(
+                    deal_id=deal_id,
+                    template_id="purchase_agreement_template",
+                    document_type="purchase_agreement",
+                    title="Motor Vehicle Purchase Agreement",
+                    generated_content="<p>Purchase Agreement Generated</p>",
+                    pdf_content=pdf_content,
+                    variables_used=deal,
+                    status=DocumentStatus.GENERATED
+                )
+                
+                await db.documents.insert_one(doc.dict())
+                generated_docs.append(doc)
+        
+        # Update deal
+        doc_ids = [doc.id for doc in generated_docs]
+        await db.deals.update_one(
+            {"id": deal_id},
+            {"$addToSet": {"documents": {"$each": doc_ids}}, "$set": {"docs_generated": True, "updated_at": datetime.utcnow()}}
+        )
+        
+        return {"message": f"Generated {len(generated_docs)} documents", "documents": generated_docs}
+        
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@api_router.get("/deals/{deal_id}/documents")
+async def get_deal_documents(deal_id: str):
+    """Get all documents for a deal"""
+    documents = await db.documents.find({"deal_id": deal_id}).to_list(100)
+    return [GeneratedDocument(**doc) for doc in documents]
+
+@api_router.get("/documents/{document_id}/pdf")
+async def get_document_pdf(document_id: str):
+    """Get PDF content of a document"""
+    document = await db.documents.find_one({"id": document_id})
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+    
+    if not document.get("pdf_content"):
+        raise HTTPException(status_code=400, detail="PDF not available for this document")
+    
+    return {"pdf_content": document["pdf_content"]}
+
+# Credit Application & Bank Integration Endpoints
+@api_router.post("/deals/{deal_id}/credit-application")
+async def create_credit_application(deal_id: str, credit_data: dict):
+    """Create a credit application for a deal"""
+    try:
+        deal = await db.deals.find_one({"id": deal_id})
+        if not deal:
+            raise HTTPException(status_code=404, detail="Deal not found")
+        
+        credit_app = CreditApplication(
+            deal_id=deal_id,
+            customer_id=deal["customer"]["id"] if "id" in deal["customer"] else str(uuid.uuid4()),
+            **credit_data
+        )
+        
+        await db.credit_applications.insert_one(credit_app.dict())
+        
+        # Update deal
+        await db.deals.update_one(
+            {"id": deal_id},
+            {"$addToSet": {"credit_applications": credit_app.id}, "$set": {"updated_at": datetime.utcnow()}}
+        )
+        
+        return credit_app
+        
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@api_router.get("/lenders")
+async def get_lenders():
+    """Get all available lenders"""
+    # Mock lender data - in production, this would be from database
+    lenders = [
+        {
+            "id": "chase_auto",
+            "name": "Chase Auto Finance",
+            "code": "CHASE",
+            "is_active": True,
+            "min_credit_score": 620,
+            "max_ltv": 0.9,
+            "interest_rates": {"36": 4.99, "48": 5.49, "60": 5.99, "72": 6.49},
+            "specialties": ["prime", "luxury"]
+        },
+        {
+            "id": "wells_fargo",
+            "name": "Wells Fargo Auto",
+            "code": "WF",
+            "is_active": True,
+            "min_credit_score": 650,
+            "max_ltv": 0.85,
+            "interest_rates": {"36": 4.75, "48": 5.25, "60": 5.75, "72": 6.25},
+            "specialties": ["prime"]
+        },
+        {
+            "id": "capital_one",
+            "name": "Capital One Auto Finance",
+            "code": "COF",
+            "is_active": True,
+            "min_credit_score": 580,
+            "max_ltv": 0.95,
+            "interest_rates": {"36": 6.99, "48": 7.49, "60": 7.99, "72": 8.49},
+            "specialties": ["subprime", "near_prime"]
+        },
+        {
+            "id": "santander",
+            "name": "Santander Consumer USA",
+            "code": "SC",
+            "is_active": True,
+            "min_credit_score": 500,
+            "max_ltv": 1.0,
+            "interest_rates": {"36": 8.99, "48": 9.99, "60": 11.99, "72": 13.99},
+            "specialties": ["subprime", "deep_subprime"]
+        }
+    ]
+    
+    return lenders
+
+@api_router.post("/deals/{deal_id}/submit-to-lenders")
+async def submit_to_lenders(deal_id: str, submission_data: dict):
+    """Submit credit application to multiple lenders"""
+    try:
+        # Get deal and credit application
+        deal = await db.deals.find_one({"id": deal_id})
+        if not deal:
+            raise HTTPException(status_code=404, detail="Deal not found")
+        
+        credit_apps = await db.credit_applications.find({"deal_id": deal_id}).to_list(10)
+        if not credit_apps:
+            raise HTTPException(status_code=400, detail="No credit application found for deal")
+        
+        credit_app = credit_apps[0]  # Use first credit application
+        selected_lenders = submission_data.get("lender_ids", [])
+        
+        submissions = []
+        
+        for lender_id in selected_lenders:
+            # Create lender submission
+            submission = LenderSubmission(
+                deal_id=deal_id,
+                credit_application_id=credit_app["id"],
+                lender_id=lender_id,
+                submitted_data={
+                    "customer": deal["customer"],
+                    "vehicle": deal["vehicle"],
+                    "credit_info": credit_app,
+                    "loan_request": {
+                        "amount": submission_data.get("loan_amount", deal["total_deal_amount"]),
+                        "term": submission_data.get("loan_term", 60)
+                    }
+                },
+                status=LenderStatus.SUBMITTED
+            )
+            
+            await db.lender_submissions.insert_one(submission.dict())
+            submissions.append(submission)
+            
+            # Simulate lender response (in production, this would be API calls)
+            await simulate_lender_response(submission.id, lender_id, credit_app)
+        
+        # Update deal
+        submission_ids = [sub.id for sub in submissions]
+        await db.deals.update_one(
+            {"id": deal_id},
+            {"$addToSet": {"lender_submissions": {"$each": submission_ids}}, "$set": {"updated_at": datetime.utcnow()}}
+        )
+        
+        return {"message": f"Submitted to {len(submissions)} lenders", "submissions": submissions}
+        
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@api_router.get("/deals/{deal_id}/lender-responses")
+async def get_lender_responses(deal_id: str):
+    """Get all lender responses for a deal"""
+    submissions = await db.lender_submissions.find({"deal_id": deal_id}).to_list(100)
+    return [LenderSubmission(**sub) for sub in submissions]
+
+async def simulate_lender_response(submission_id: str, lender_id: str, credit_app: dict):
+    """Simulate lender response based on credit profile"""
+    # Simple simulation based on credit score
+    credit_score = credit_app.get("customer", {}).get("credit_score", 650)
+    
+    # Determine approval likelihood
+    if credit_score >= 720:
+        decision = "approved"
+        rate_adjustment = 0.0
+    elif credit_score >= 650:
+        decision = "approved"
+        rate_adjustment = 1.0
+    elif credit_score >= 600:
+        decision = "conditional"
+        rate_adjustment = 2.0
+    else:
+        decision = "approved" if lender_id in ["santander", "capital_one"] else "declined"
+        rate_adjustment = 3.0
+    
+    # Update submission with response
+    if decision == "approved":
+        update_data = {
+            "status": LenderStatus.APPROVED,
+            "decision": "approved",
+            "approved_amount": credit_app.get("requested_amount", 25000),
+            "approved_rate": 5.99 + rate_adjustment,
+            "approved_term": credit_app.get("requested_term", 60),
+            "responded_at": datetime.utcnow()
+        }
+    elif decision == "conditional":
+        update_data = {
+            "status": LenderStatus.CONDITIONAL,
+            "decision": "conditional",
+            "approved_amount": credit_app.get("requested_amount", 25000) * 0.9,
+            "approved_rate": 7.99 + rate_adjustment,
+            "approved_term": credit_app.get("requested_term", 60),
+            "stipulations": ["Proof of Income", "Verification of Employment"],
+            "responded_at": datetime.utcnow()
+        }
+    else:
+        update_data = {
+            "status": LenderStatus.DECLINED,
+            "decision": "declined",
+            "decline_reason": "Credit score below minimum requirements",
+            "responded_at": datetime.utcnow()
+        }
+    
+    await db.lender_submissions.update_one({"id": submission_id}, {"$set": update_data})
+
+# E-Signature Endpoints
+@api_router.post("/documents/{document_id}/signature-request")
+async def create_signature_request(document_id: str, signature_data: dict):
+    """Create a signature request for a document"""
+    try:
+        document = await db.documents.find_one({"id": document_id})
+        if not document:
+            raise HTTPException(status_code=404, detail="Document not found")
+        
+        signature_request = SignatureRequest(
+            document_id=document_id,
+            deal_id=document["deal_id"],
+            signers=signature_data.get("signers", []),
+            signing_order=signature_data.get("signing_order", []),
+            expires_at=signature_data.get("expires_at")
+        )
+        
+        await db.signature_requests.insert_one(signature_request.dict())
+        
+        # Update document status
+        await db.documents.update_one(
+            {"id": document_id},
+            {"$set": {"status": DocumentStatus.SENT_FOR_SIGNATURE, "updated_at": datetime.utcnow()}}
+        )
+        
+        return signature_request
+        
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@api_router.post("/signature-requests/{request_id}/sign")
+async def sign_document(request_id: str, signature_data: dict):
+    """Add a signature to a document"""
+    try:
+        signature_request = await db.signature_requests.find_one({"id": request_id})
+        if not signature_request:
+            raise HTTPException(status_code=404, detail="Signature request not found")
+        
+        signature = Signature(
+            signature_request_id=request_id,
+            document_id=signature_request["document_id"],
+            signer_email=signature_data.get("signer_email"),
+            signer_name=signature_data.get("signer_name"),
+            signature_data=signature_data.get("signature_data"),
+            ip_address=signature_data.get("ip_address"),
+            user_agent=signature_data.get("user_agent"),
+            signed_at=datetime.utcnow(),
+            legal_notice_acknowledged=signature_data.get("legal_notice_acknowledged", False)
+        )
+        
+        await db.signatures.insert_one(signature.dict())
+        
+        # Check if all signatures are complete
+        all_signatures = await db.signatures.find({"signature_request_id": request_id}).to_list(100)
+        required_signers = len(signature_request["signers"])
+        
+        if len(all_signatures) >= required_signers:
+            # All signatures complete
+            await db.signature_requests.update_one(
+                {"id": request_id},
+                {"$set": {"status": "completed", "completed_at": datetime.utcnow()}}
+            )
+            
+            # Update document status
+            await db.documents.update_one(
+                {"id": signature_request["document_id"]},
+                {"$set": {"status": DocumentStatus.SIGNED, "updated_at": datetime.utcnow()}}
+            )
+        
+        return signature
+        
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@api_router.get("/deals/{deal_id}/signature-status")
+async def get_deal_signature_status(deal_id: str):
+    """Get signature status for all documents in a deal"""
+    documents = await db.documents.find({"deal_id": deal_id}).to_list(100)
+    signature_requests = await db.signature_requests.find({"deal_id": deal_id}).to_list(100)
+    
+    status = {
+        "total_documents": len(documents),
+        "documents_requiring_signature": sum(1 for doc in documents if doc.get("signature_required", False)),
+        "documents_signed": sum(1 for doc in documents if doc.get("status") == DocumentStatus.SIGNED),
+        "signature_requests": signature_requests
+    }
+    
+    return status
 
 
 # Include the router in the main app
