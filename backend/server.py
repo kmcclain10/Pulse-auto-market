@@ -61,14 +61,68 @@ class VSCCoverage(str, Enum):
     PREMIUM = "premium"
 
 class FormType(str, Enum):
+    # Core Purchase Documents
+    PURCHASE_AGREEMENT = "purchase_agreement"  # Car Purchase Agreement / Buyer's Order
+    BUYERS_ORDER = "buyers_order"
+    
+    # Federal Required Documents
+    ODOMETER_DISCLOSURE = "odometer_disclosure"  # Federal requirement
+    TRUTH_IN_LENDING = "truth_in_lending"  # TILA Disclosure
+    
+    # Title & Registration
+    TITLE_TRANSFER = "title_transfer"
+    TITLE_APPLICATION = "title_application"
+    REGISTRATION_APPLICATION = "registration_application"
+    
+    # Financing Documents
+    FINANCE_CONTRACT = "finance_contract"  # Loan Agreement
+    LOAN_APPLICATION = "loan_application"
     CREDIT_APPLICATION = "credit_application"
-    PURCHASE_AGREEMENT = "purchase_agreement"
-    FINANCE_CONTRACT = "finance_contract"
-    TITLE_REGISTRATION = "title_registration"
+    PROMISSORY_NOTE = "promissory_note"
+    SECURITY_AGREEMENT = "security_agreement"
+    
+    # Disclosure Documents
+    DAMAGE_DISCLOSURE = "damage_disclosure"  # For used cars
+    LEMON_LAW_DISCLOSURE = "lemon_law_disclosure"
+    AS_IS_DISCLOSURE = "as_is_disclosure"
+    WARRANTIES_DISCLOSURE = "warranties_disclosure"
+    
+    # Trade-in Documents
+    TRADE_IN_APPRAISAL = "trade_in_appraisal"
+    TRADE_IN_AGREEMENT = "trade_in_agreement"
+    TRADE_IN_TITLE = "trade_in_title"
+    TRADE_IN_PAYOFF = "trade_in_payoff"
+    
+    # F&I Products
+    EXTENDED_WARRANTY = "extended_warranty"  # Extended Warranty Contract
+    VSC_CONTRACT = "vsc_contract"  # Vehicle Service Contract
+    GAP_INSURANCE = "gap_insurance"
+    
+    # Rebates & Incentives
+    MANUFACTURER_REBATE = "manufacturer_rebate"
+    DEALER_REBATE = "dealer_rebate"
+    INCENTIVE_ASSIGNMENT = "incentive_assignment"
+    CASH_BACK_FORM = "cash_back_form"
+    
+    # Insurance Documents
     INSURANCE_CERTIFICATE = "insurance_certificate"
-    WINDOW_STICKER = "window_sticker"
-    ODOMETER_DISCLOSURE = "odometer_disclosure"
-    LEMON_LAW = "lemon_law"
+    INSURANCE_VERIFICATION = "insurance_verification"
+    
+    # Additional Required Forms
+    WINDOW_STICKER = "window_sticker"  # Monroney Label
+    BILL_OF_SALE = "bill_of_sale"
+    SALES_TAX_FORM = "sales_tax_form"
+    POWER_OF_ATTORNEY = "power_of_attorney"
+    
+    # State-Specific Forms
+    SMOG_CERTIFICATE = "smog_certificate"  # CA
+    SAFETY_INSPECTION = "safety_inspection"  # Various states
+    VIN_VERIFICATION = "vin_verification"
+    
+    # Customer Documents
+    DELIVERY_RECEIPT = "delivery_receipt"
+    KEYS_RECEIPT = "keys_receipt"
+    MANUAL_RECEIPT = "manual_receipt"
 
 class FormStatus(str, Enum):
     DRAFT = "draft"
