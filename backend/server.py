@@ -743,6 +743,222 @@ def generate_purchase_agreement_pdf(deal_data: Dict) -> str:
     buffer.close()
     
     # Return base64 encoded PDF
+def generate_odometer_disclosure_pdf(deal_data: Dict) -> str:
+    """Generate Odometer Disclosure Statement PDF"""
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter)
+    styles = getSampleStyleSheet()
+    story = []
+    
+    # Title
+    title = Paragraph("FEDERAL ODOMETER DISCLOSURE STATEMENT", styles['Title'])
+    story.append(title)
+    story.append(Spacer(1, 12))
+    
+    # Federal Warning
+    warning = """
+    <b>FEDERAL LAW REQUIRES THAT YOU STATE THE MILEAGE IN CONNECTION WITH THE TRANSFER OF OWNERSHIP. 
+    FAILURE TO COMPLETE OR PROVIDING A FALSE STATEMENT MAY RESULT IN FINES AND/OR IMPRISONMENT.</b>
+    """
+    story.append(Paragraph(warning, styles['Normal']))
+    story.append(Spacer(1, 12))
+    
+    # Vehicle Information
+    vehicle = deal_data.get('vehicle', {})
+    vehicle_info = f"""
+    <b>VEHICLE IDENTIFICATION:</b><br/>
+    Year: {vehicle.get('year', '')}<br/>
+    Make: {vehicle.get('make', '')}<br/>
+    Model: {vehicle.get('model', '')}<br/>
+    Body Type: Sedan<br/>
+    Vehicle Identification Number: {vehicle.get('vin', '')}
+    """
+    story.append(Paragraph(vehicle_info, styles['Normal']))
+    story.append(Spacer(1, 12))
+    
+    # Odometer Reading
+    odometer_info = f"""
+    <b>ODOMETER DISCLOSURE:</b><br/>
+    I state that the odometer now reads: <b>{vehicle.get('mileage', 0):,} miles</b><br/><br/>
+    (Check one box only):<br/>
+    ☑ I hereby certify that to the best of my knowledge the odometer reading reflects the actual mileage of the vehicle.<br/>
+    ☐ I hereby certify that to the best of my knowledge the odometer reading reflects the amount of mileage in excess of its mechanical limits.<br/>
+    ☐ I hereby certify that to the best of my knowledge the odometer reading is NOT the actual mileage.
+    """
+    story.append(Paragraph(odometer_info, styles['Normal']))
+    story.append(Spacer(1, 24))
+    
+    # Signature blocks
+    signature_section = """
+    <b>TRANSFEROR (SELLER):</b><br/><br/>
+    Signature: _________________________________ Date: ___________<br/><br/>
+    Print Name: _________________________________<br/><br/>
+    <b>TRANSFEREE (BUYER):</b><br/><br/>
+    Signature: _________________________________ Date: ___________<br/><br/>
+    Print Name: _________________________________
+    """
+    story.append(Paragraph(signature_section, styles['Normal']))
+    
+    # Build PDF
+    doc.build(story)
+    pdf_bytes = buffer.getvalue()
+    buffer.close()
+    
+    return base64.b64encode(pdf_bytes).decode('utf-8')
+
+def generate_truth_in_lending_pdf(deal_data: Dict) -> str:
+    """Generate Truth-in-Lending Disclosure PDF"""
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter)
+    styles = getSampleStyleSheet()
+    story = []
+    
+    # Title
+    title = Paragraph("TRUTH-IN-LENDING DISCLOSURE STATEMENT", styles['Title'])
+    story.append(title)
+    story.append(Spacer(1, 12))
+    
+    # Creditor Information
+    creditor_info = """
+    <b>CREDITOR:</b> ABC Motors Finance<br/>
+    <b>ADDRESS:</b> 123 Main Street, City, State 12345
+    """
+    story.append(Paragraph(creditor_info, styles['Normal']))
+    story.append(Spacer(1, 12))
+    
+    # Customer Information
+    customer = deal_data.get('customer', {})
+    customer_info = f"""
+    <b>CUSTOMER:</b> {customer.get('first_name', '')} {customer.get('last_name', '')}<br/>
+    <b>ADDRESS:</b> {customer.get('address', '')}, {customer.get('city', '')}, {customer.get('state', '')} {customer.get('zip_code', '')}
+    """
+    story.append(Paragraph(customer_info, styles['Normal']))
+    story.append(Spacer(1, 12))
+    
+    # Finance terms
+    finance_terms = deal_data.get('finance_terms', {})
+    
+    # TILA Box
+    tila_data = [
+        ['ANNUAL PERCENTAGE RATE', 'FINANCE CHARGE', 'AMOUNT FINANCED', 'TOTAL OF PAYMENTS'],
+        [f"{finance_terms.get('apr', 0)}%", f"${finance_terms.get('total_interest', 0):,.2f}", 
+         f"${finance_terms.get('loan_amount', 0):,.2f}", f"${finance_terms.get('total_cost', 0):,.2f}"],
+        ['The cost of your credit as a yearly rate', 'The dollar amount the credit will cost you', 
+         'The amount of credit provided to you', 'The amount you will have paid after making all payments']
+    ]
+    
+    tila_table = Table(tila_data, colWidths=[1.5*inch, 1.5*inch, 1.5*inch, 1.5*inch])
+    tila_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.black),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 10),
+        ('FONTSIZE', (0, 1), (-1, 1), 14),
+        ('FONTNAME', (0, 1), (-1, 1), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 2), (-1, 2), 8),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, 1), colors.lightgrey),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black),
+    ]))
+    
+    story.append(tila_table)
+    story.append(Spacer(1, 12))
+    
+    # Payment schedule
+    payment_info = f"""
+    <b>PAYMENT SCHEDULE:</b><br/>
+    Number of Payments: {finance_terms.get('term_months', 0)}<br/>
+    Amount of Payments: ${finance_terms.get('monthly_payment', 0):,.2f}<br/>
+    When Payments are Due: Monthly beginning 30 days from date of this contract
+    """
+    story.append(Paragraph(payment_info, styles['Normal']))
+    story.append(Spacer(1, 12))
+    
+    # Security interest
+    vehicle = deal_data.get('vehicle', {})
+    security_info = f"""
+    <b>SECURITY:</b> You are giving a security interest in the {vehicle.get('year', '')} {vehicle.get('make', '')} {vehicle.get('model', '')} being purchased.
+    """
+    story.append(Paragraph(security_info, styles['Normal']))
+    story.append(Spacer(1, 24))
+    
+    # Signature
+    signature_section = """
+    <b>ACKNOWLEDGMENT:</b><br/>
+    I acknowledge receipt of a copy of this disclosure statement.<br/><br/>
+    Customer Signature: _________________________________ Date: ___________
+    """
+    story.append(Paragraph(signature_section, styles['Normal']))
+    
+    # Build PDF
+    doc.build(story)
+    pdf_bytes = buffer.getvalue()
+    buffer.close()
+    
+    return base64.b64encode(pdf_bytes).decode('utf-8')
+
+def generate_bill_of_sale_pdf(deal_data: Dict) -> str:
+    """Generate Bill of Sale PDF"""
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter)
+    styles = getSampleStyleSheet()
+    story = []
+    
+    # Title
+    title = Paragraph("MOTOR VEHICLE BILL OF SALE", styles['Title'])
+    story.append(title)
+    story.append(Spacer(1, 12))
+    
+    # Transaction details
+    customer = deal_data.get('customer', {})
+    vehicle = deal_data.get('vehicle', {})
+    
+    transaction_info = f"""
+    <b>SELLER:</b> ABC Motors<br/>
+    Address: 123 Main Street, City, State 12345<br/><br/>
+    
+    <b>BUYER:</b> {customer.get('first_name', '')} {customer.get('last_name', '')}<br/>
+    Address: {customer.get('address', '')}, {customer.get('city', '')}, {customer.get('state', '')} {customer.get('zip_code', '')}<br/><br/>
+    
+    <b>VEHICLE DESCRIPTION:</b><br/>
+    Year: {vehicle.get('year', '')}<br/>
+    Make: {vehicle.get('make', '')}<br/>
+    Model: {vehicle.get('model', '')}<br/>
+    VIN: {vehicle.get('vin', '')}<br/>
+    Odometer: {vehicle.get('mileage', 0):,} miles<br/><br/>
+    
+    <b>PURCHASE PRICE:</b> ${vehicle.get('selling_price', 0):,.2f}<br/>
+    <b>DATE OF SALE:</b> {datetime.utcnow().strftime('%B %d, %Y')}
+    """
+    story.append(Paragraph(transaction_info, styles['Normal']))
+    story.append(Spacer(1, 24))
+    
+    # Legal text
+    legal_text = """
+    The seller hereby sells, transfers and conveys to the buyer the above described motor vehicle. 
+    The seller warrants that they have good and marketable title to said vehicle, free and clear of all liens and encumbrances.
+    """
+    story.append(Paragraph(legal_text, styles['Normal']))
+    story.append(Spacer(1, 24))
+    
+    # Signatures
+    signature_section = """
+    <b>SELLER:</b><br/><br/>
+    Signature: _________________________________ Date: ___________<br/>
+    Print Name: ABC Motors Representative<br/><br/>
+    
+    <b>BUYER:</b><br/><br/>
+    Signature: _________________________________ Date: ___________<br/>
+    Print Name: {customer.get('first_name', '')} {customer.get('last_name', '')}
+    """.format(customer=customer)
+    story.append(Paragraph(signature_section, styles['Normal']))
+    
+    # Build PDF
+    doc.build(story)
+    pdf_bytes = buffer.getvalue()
+    buffer.close()
+    
     return base64.b64encode(pdf_bytes).decode('utf-8')
 def calculate_finance_payment(loan_amount: float, apr: float, term_months: int) -> Dict[str, float]:
     """Calculate monthly payment and total interest for a loan"""
