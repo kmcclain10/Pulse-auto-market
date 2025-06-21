@@ -88,10 +88,34 @@ const DealDetails = () => {
             {getStatusBadge(deal.status)}
             <div className="flex space-x-2">
               <Link
+                to={`/deal/${deal.id}/financing`}
+                className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+              >
+                🏦 Financing
+              </Link>
+              <Link
+                to={`/deal/${deal.id}/forms`}
+                className="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+              >
+                📋 Forms
+              </Link>
+              <Link
+                to={`/deal/${deal.id}/documents`}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+              >
+                📄 Docs
+              </Link>
+              <Link
+                to={`/deal/${deal.id}/signatures`}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+              >
+                ✍️ E-Sign
+              </Link>
+              <Link
                 to={`/deal/${deal.id}/menu`}
                 className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
               >
-                F&I Menu
+                💰 F&I Menu
               </Link>
               <Link
                 to="/"
