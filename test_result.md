@@ -116,6 +116,9 @@ backend:
         - working: true
           agent: "testing"
           comment: "Successfully tested creating deals with customer info, vehicle details, and trade-ins. Tax calculation works correctly based on state. VSC options are generated properly based on vehicle details. Deal structuring with totals is accurate."
+        - working: true
+          agent: "testing"
+          comment: "Verified ObjectId serialization fix is working correctly. Deals can be created, retrieved, and serialized to JSON without any errors."
 
   - task: "Deal Management"
     implemented: true
@@ -128,6 +131,9 @@ backend:
         - working: true
           agent: "testing"
           comment: "Successfully tested listing all deals and retrieving individual deal details. Proper error handling for non-existent deals (404 response)."
+        - working: true
+          agent: "testing"
+          comment: "Verified deal management endpoints work correctly with the ObjectId serialization fix. All deals can be retrieved and individual deals can be accessed without serialization errors."
 
   - task: "Finance Calculator"
     implemented: true
@@ -176,6 +182,30 @@ backend:
         - working: true
           agent: "testing"
           comment: "Successfully tested updating deals with selected VSC and GAP products. Deal totals are recalculated correctly with F&I products. Markup calculations are applied properly."
+
+  - task: "Document Generation"
+    implemented: true
+    working: false
+    file: "/app/backend/server.py"
+    stuck_count: 1
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: false
+          agent: "testing"
+          comment: "Document generation endpoint returns a 400 error with the message: 'dict' object has no attribute 'get('first_name', '')'. There appears to be an issue with accessing nested customer data in the document generation functions."
+
+  - task: "Complete Enterprise Workflow"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "Successfully tested the complete enterprise workflow including deal creation, finance terms, F&I product selection, and integration between components. The workflow functions correctly with the ObjectId serialization fix."
 
 frontend:
   - task: "Dashboard"
@@ -256,12 +286,14 @@ frontend:
 metadata:
   created_by: "testing_agent"
   version: "1.0"
-  test_sequence: 1
+  test_sequence: 2
   run_ui: false
 
 test_plan:
-  current_focus: []
-  stuck_tasks: []
+  current_focus: 
+    - "Document Generation"
+  stuck_tasks:
+    - "Document Generation"
   test_all: false
   test_priority: "high_first"
 
@@ -272,3 +304,5 @@ agent_communication:
       message: "Starting comprehensive testing of the frontend components. Will test Dashboard, Deal Creation Form, Deal Details Page, Finance Calculator Component, and F&I Menu Selling Interface."
     - agent: "testing"
       message: "Completed comprehensive testing of all frontend components. All components are working correctly. The Dashboard displays stats and deals table properly. The Deal Creation Form allows creating new deals with all required information. The Deal Details Page shows complete deal information with proper calculations. The Finance Calculator Component calculates payments correctly. The F&I Menu Selling Interface displays VSC and GAP options properly with real-time calculations. The application is responsive and works well on different screen sizes."
+    - agent: "testing"
+      message: "Tested the ObjectId serialization fix and verified it's working correctly. All API endpoints can now handle MongoDB ObjectId fields properly. The complete enterprise workflow integration test passed successfully, confirming that all components work together seamlessly. However, there's an issue with the document generation endpoint that needs to be fixed. The endpoint returns a 400 error with the message: 'dict' object has no attribute 'get('first_name', '')'. This appears to be an issue with accessing nested customer data in the document generation functions."
