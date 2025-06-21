@@ -743,6 +743,7 @@ def generate_purchase_agreement_pdf(deal_data: Dict) -> str:
     buffer.close()
     
     # Return base64 encoded PDF
+    return base64.b64encode(pdf_bytes).decode('utf-8')
 def generate_odometer_disclosure_pdf(deal_data: Dict) -> str:
     """Generate Odometer Disclosure Statement PDF"""
     buffer = io.BytesIO()
