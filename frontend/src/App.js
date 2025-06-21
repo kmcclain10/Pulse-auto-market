@@ -9,6 +9,9 @@ import FormsManager from "./components/FormsManager";
 import DocumentsManager from "./components/DocumentsManager";
 import ESignatureManager from "./components/ESignatureManager";
 import BankIntegration from "./components/BankIntegration";
+import CRMDashboard from "./components/CRMDashboard";
+import LeadManagement from "./components/LeadManagement";
+import CommunicationHub from "./components/CommunicationHub";
 import Navbar from "./components/Navbar";
 
 function App() {
@@ -18,6 +21,7 @@ function App() {
         <Navbar />
         <div className="container mx-auto px-4 py-8">
           <Routes>
+            {/* F&I Desking Routes */}
             <Route path="/" element={<Dashboard />} />
             <Route path="/deal/new" element={<DealForm />} />
             <Route path="/deal/:dealId" element={<DealDetails />} />
@@ -26,6 +30,13 @@ function App() {
             <Route path="/deal/:dealId/documents" element={<DocumentsManager />} />
             <Route path="/deal/:dealId/signatures" element={<ESignatureManager />} />
             <Route path="/deal/:dealId/financing" element={<BankIntegration />} />
+            
+            {/* CRM Routes */}
+            <Route path="/crm" element={<CRMDashboard />} />
+            <Route path="/crm/leads" element={<LeadManagement />} />
+            <Route path="/crm/communications" element={<CommunicationHub />} />
+            
+            {/* Standalone Routes */}
             <Route path="/forms" element={<FormsManager />} />
             <Route path="/documents" element={<DocumentsManager />} />
           </Routes>
