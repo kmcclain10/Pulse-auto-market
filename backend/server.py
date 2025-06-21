@@ -1253,21 +1253,36 @@ def generate_bill_of_sale_pdf(deal_data: Dict) -> str:
     customer = deal_data.get('customer', {})
     vehicle = deal_data.get('vehicle', {})
     
+    # Handle both dict and object access patterns
+    first_name = customer.get('first_name', '') if isinstance(customer, dict) else getattr(customer, 'first_name', '')
+    last_name = customer.get('last_name', '') if isinstance(customer, dict) else getattr(customer, 'last_name', '')
+    address = customer.get('address', '') if isinstance(customer, dict) else getattr(customer, 'address', '')
+    city = customer.get('city', '') if isinstance(customer, dict) else getattr(customer, 'city', '')
+    state = customer.get('state', '') if isinstance(customer, dict) else getattr(customer, 'state', '')
+    zip_code = customer.get('zip_code', '') if isinstance(customer, dict) else getattr(customer, 'zip_code', '')
+    
+    year = vehicle.get('year', '') if isinstance(vehicle, dict) else getattr(vehicle, 'year', '')
+    make = vehicle.get('make', '') if isinstance(vehicle, dict) else getattr(vehicle, 'make', '')
+    model = vehicle.get('model', '') if isinstance(vehicle, dict) else getattr(vehicle, 'model', '')
+    vin = vehicle.get('vin', '') if isinstance(vehicle, dict) else getattr(vehicle, 'vin', '')
+    mileage = vehicle.get('mileage', 0) if isinstance(vehicle, dict) else getattr(vehicle, 'mileage', 0)
+    selling_price = vehicle.get('selling_price', 0) if isinstance(vehicle, dict) else getattr(vehicle, 'selling_price', 0)
+    
     transaction_info = f"""
     <b>SELLER:</b> ABC Motors<br/>
     Address: 123 Main Street, City, State 12345<br/><br/>
     
-    <b>BUYER:</b> {customer.get('first_name', '')} {customer.get('last_name', '')}<br/>
-    Address: {customer.get('address', '')}, {customer.get('city', '')}, {customer.get('state', '')} {customer.get('zip_code', '')}<br/><br/>
+    <b>BUYER:</b> {first_name} {last_name}<br/>
+    Address: {address}, {city}, {state} {zip_code}<br/><br/>
     
     <b>VEHICLE DESCRIPTION:</b><br/>
-    Year: {vehicle.get('year', '')}<br/>
-    Make: {vehicle.get('make', '')}<br/>
-    Model: {vehicle.get('model', '')}<br/>
-    VIN: {vehicle.get('vin', '')}<br/>
-    Odometer: {vehicle.get('mileage', 0):,} miles<br/><br/>
+    Year: {year}<br/>
+    Make: {make}<br/>
+    Model: {model}<br/>
+    VIN: {vin}<br/>
+    Odometer: {mileage:,} miles<br/><br/>
     
-    <b>PURCHASE PRICE:</b> ${vehicle.get('selling_price', 0):,.2f}<br/>
+    <b>PURCHASE PRICE:</b> ${selling_price:,.2f}<br/>
     <b>DATE OF SALE:</b> {datetime.utcnow().strftime('%B %d, %Y')}
     """
     story.append(Paragraph(transaction_info, styles['Normal']))
@@ -1282,15 +1297,15 @@ def generate_bill_of_sale_pdf(deal_data: Dict) -> str:
     story.append(Spacer(1, 24))
     
     # Signatures
-    signature_section = """
+    signature_section = f"""
     <b>SELLER:</b><br/><br/>
     Signature: _________________________________ Date: ___________<br/>
     Print Name: ABC Motors Representative<br/><br/>
     
     <b>BUYER:</b><br/><br/>
     Signature: _________________________________ Date: ___________<br/>
-    Print Name: {customer.get('first_name', '')} {customer.get('last_name', '')}
-    """.format(customer=customer)
+    Print Name: {first_name} {last_name}
+    """
     story.append(Paragraph(signature_section, styles['Normal']))
     
     # Build PDF
