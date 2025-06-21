@@ -173,7 +173,162 @@ class GAPOption(BaseModel):
     description: str
 
 
-# Deal Models
+# Forms Management Models
+class FormTemplate(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    form_type: FormType
+    state: str  # State code (e.g., "CA", "TX")
+    version: str = "1.0"
+    title: str
+    description: str
+    fields: List[Dict[str, Any]]  # Dynamic form fields
+    compliance_notes: Optional[str] = None
+    is_active: bool = True
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+class FormData(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    deal_id: str
+    form_template_id: str
+    form_type: FormType
+    status: FormStatus = FormStatus.DRAFT
+    field_values: Dict[str, Any] = {}
+    signatures: List[Dict[str, Any]] = []
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+# Bank Integration Models
+class Lender(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    code: str  # Lender identifier
+    api_endpoint: Optional[str] = None
+    is_active: bool = True
+    min_credit_score: Optional[int] = None
+    max_ltv: Optional[float] = None
+    interest_rates: Dict[str, float] = {}  # Term-based rates
+    specialties: List[str] = []  # e.g., ["subprime", "luxury", "commercial"]
+
+class CreditApplication(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    deal_id: str
+    customer_id: str
+    
+    # Personal Information
+    ssn: Optional[str] = None
+    date_of_birth: Optional[datetime] = None
+    employment_status: Optional[str] = None
+    employer_name: Optional[str] = None
+    monthly_income: Optional[float] = None
+    housing_status: Optional[str] = None  # rent, own, other
+    monthly_housing_payment: Optional[float] = None
+    
+    # Co-applicant Information
+    co_applicant: Optional[Dict[str, Any]] = None
+    
+    # Loan Details
+    requested_amount: float
+    requested_term: int
+    down_payment: float = 0.0
+    
+    # Status
+    status: str = "draft"
+    submitted_at: Optional[datetime] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+class LenderSubmission(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    deal_id: str
+    credit_application_id: str
+    lender_id: str
+    
+    # Submission Details
+    submitted_data: Dict[str, Any]
+    status: LenderStatus = LenderStatus.SUBMITTED
+    
+    # Response Details
+    decision: Optional[str] = None
+    approved_amount: Optional[float] = None
+    approved_rate: Optional[float] = None
+    approved_term: Optional[int] = None
+    stipulations: List[str] = []
+    decline_reason: Optional[str] = None
+    
+    # Timestamps
+    submitted_at: datetime = Field(default_factory=datetime.utcnow)
+    responded_at: Optional[datetime] = None
+
+# Document Generation Models
+class DocumentTemplate(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    document_type: str
+    template_content: str  # HTML or template format
+    variables: List[str]  # List of variable names used in template
+    state_specific: bool = False
+    states: List[str] = []  # If state_specific, which states
+    version: str = "1.0"
+    is_active: bool = True
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+class GeneratedDocument(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    deal_id: str
+    template_id: str
+    document_type: str
+    title: str
+    
+    # Content
+    generated_content: str  # HTML content
+    pdf_content: Optional[str] = None  # Base64 encoded PDF
+    variables_used: Dict[str, Any] = {}
+    
+    # Status & Signatures
+    status: DocumentStatus = DocumentStatus.DRAFT
+    signature_required: bool = False
+    signatures: List[Dict[str, Any]] = []
+    
+    # Timestamps
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+# E-Signature Models
+class SignatureRequest(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    document_id: str
+    deal_id: str
+    
+    # Signers
+    signers: List[Dict[str, Any]]  # List of people who need to sign
+    
+    # Configuration
+    signing_order: List[str] = []  # Order of signing if sequential
+    expires_at: Optional[datetime] = None
+    
+    # Status
+    status: str = "pending"
+    completed_at: Optional[datetime] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+class Signature(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    signature_request_id: str
+    document_id: str
+    signer_email: str
+    signer_name: str
+    
+    # Signature Data
+    signature_data: Optional[str] = None  # Base64 encoded signature image
+    ip_address: Optional[str] = None
+    user_agent: Optional[str] = None
+    signed_at: Optional[datetime] = None
+    
+    # Legal
+    legal_notice_acknowledged: bool = False
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+# Update the main Deal model to include new relationships
 class Deal(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     deal_number: str = Field(default_factory=lambda: f"DEAL-{str(uuid.uuid4())[:8].upper()}")
@@ -193,12 +348,24 @@ class Deal(BaseModel):
     selected_vsc: Optional[str] = None  # VSC option ID
     gap_option: Optional[GAPOption] = None
     
+    # NEW: Forms & Documents
+    forms: List[str] = []  # Form IDs
+    documents: List[str] = []  # Document IDs
+    credit_applications: List[str] = []  # Credit Application IDs
+    lender_submissions: List[str] = []  # Lender Submission IDs
+    
     # Deal summary
     total_vehicle_price: float
     total_fees_taxes: float
     total_fi_products: float
     total_deal_amount: float
     gross_profit: float = 0.0
+    
+    # Workflow status
+    forms_completed: bool = False
+    docs_generated: bool = False
+    signatures_completed: bool = False
+    funding_completed: bool = False
     
     # Metadata
     salesperson: Optional[str] = None
