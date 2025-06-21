@@ -3,6 +3,7 @@ import json
 import pytest
 import os
 from pprint import pprint
+import base64
 
 # Get the backend URL from environment variable
 BACKEND_URL = "https://a8223785-4b39-409d-a292-0a964f08dd99.preview.emergentagent.com/api"
@@ -44,6 +45,48 @@ test_trade_in = {
     "estimated_value": 15000.00,
     "payoff_amount": 10000.00,
     "net_trade_value": 5000.00
+}
+
+# Test data for credit application
+test_credit_application = {
+    "ssn": "123-45-6789",
+    "date_of_birth": "1980-01-01T00:00:00.000Z",
+    "employment_status": "employed",
+    "employer_name": "Acme Corporation",
+    "monthly_income": 6500.00,
+    "housing_status": "own",
+    "monthly_housing_payment": 1500.00,
+    "requested_amount": 25000.00,
+    "requested_term": 60,
+    "down_payment": 5000.00
+}
+
+# Test data for enterprise customer
+test_enterprise_customer = {
+    "first_name": "Enterprise",
+    "last_name": "Test",
+    "email": "enterprise.test@example.com",
+    "phone": "555-987-6543",
+    "address": "789 Corporate Blvd",
+    "city": "San Francisco",
+    "state": "CA",
+    "zip_code": "94107",
+    "ssn_last_four": "9876",
+    "credit_score": 750
+}
+
+# Test data for enterprise vehicle
+test_enterprise_vehicle = {
+    "vin": "5UXWX7C5*BA123456",
+    "year": 2023,
+    "make": "BMW",
+    "model": "X5",
+    "trim": "xDrive40i",
+    "condition": "new",
+    "mileage": 150,
+    "msrp": 65000.00,
+    "invoice_price": 60000.00,
+    "selling_price": 45000.00
 }
 
 # Test class for F&I Desking Tool API
