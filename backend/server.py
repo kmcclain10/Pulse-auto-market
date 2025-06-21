@@ -162,6 +162,11 @@ async def get_vehicle(vehicle_id: str):
     vehicle = await db.vehicles.find_one({"id": vehicle_id})
     if not vehicle:
         raise HTTPException(status_code=404, detail="Vehicle not found")
+    
+    # Convert ObjectId to string
+    if "_id" in vehicle:
+        vehicle["_id"] = str(vehicle["_id"])
+    
     return vehicle
 
 @api_router.delete("/vehicles/{vehicle_id}")
@@ -186,6 +191,12 @@ async def get_dealer_stats():
     ]
     
     stats = await db.vehicles.aggregate(pipeline).to_list(100)
+    
+    # Convert ObjectId to string
+    for stat in stats:
+        if "_id" in stat:
+            stat["_id"] = str(stat["_id"])
+    
     return stats
 
 # Background task function
