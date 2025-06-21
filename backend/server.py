@@ -1272,6 +1272,378 @@ def generate_gap_option(loan_amount: float, vehicle_value: float) -> GAPOption:
 async def root():
     return {"message": "Dealer Management System API - F&I Desking Tool"}
 
+# CRM & Communication Management Endpoints
+
+# Lead Management Endpoints
+@api_router.post("/leads", response_model=Lead)
+async def create_lead(lead_data: dict):
+    """Create a new lead with AI scoring"""
+    try:
+        # Calculate AI lead score
+        score = await analyze_lead_score(lead_data)
+        lead_data["score"] = score
+        
+        # Create lead
+        lead = Lead(**lead_data)
+        
+        # Save to database
+        await db.leads.insert_one(lead.dict())
+        
+        # Generate auto-response if email provided
+        if lead.email:
+            auto_response = await auto_respond_to_inquiry(
+                "Initial inquiry", 
+                lead.dict()
+            )
+            
+            # Create communication record
+            communication = Communication(
+                lead_id=lead.id,
+                type="email",
+                direction="outbound",
+                subject="Thank you for your interest!",
+                content=auto_response,
+                to_email=lead.email,
+                is_ai_generated=True,
+                ai_model="gpt-4"
+            )
+            
+            await db.communications.insert_one(communication.dict())
+        
+        return lead
+        
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@api_router.get("/leads", response_model=List[Lead])
+async def get_leads(
+    status: Optional[str] = None,
+    source: Optional[str] = None,
+    assigned_to: Optional[str] = None,
+    min_score: Optional[int] = None
+):
+    """Get leads with filtering options"""
+    try:
+        # Build filter query
+        query = {}
+        if status:
+            query["status"] = status
+        if source:
+            query["source"] = source
+        if assigned_to:
+            query["assigned_salesperson"] = assigned_to
+        if min_score:
+            query["score"] = {"$gte": min_score}
+        
+        leads = await db.leads.find(query).sort("created_at", -1).to_list(100)
+        return [Lead(**lead) for lead in leads]
+        
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@api_router.get("/leads/{lead_id}", response_model=Lead)
+async def get_lead(lead_id: str):
+    """Get a specific lead"""
+    lead = await db.leads.find_one({"id": lead_id})
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead not found")
+    return Lead(**lead)
+
+@api_router.put("/leads/{lead_id}/status")
+async def update_lead_status(lead_id: str, status_data: dict):
+    """Update lead status and trigger automation"""
+    try:
+        new_status = status_data.get("status")
+        
+        # Update lead
+        result = await db.leads.update_one(
+            {"id": lead_id},
+            {"$set": {"status": new_status, "updated_at": datetime.utcnow()}}
+        )
+        
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail="Lead not found")
+        
+        # Trigger automation based on status change
+        if new_status == "qualified":
+            # Create follow-up task
+            task = Task(
+                title="Follow up with qualified lead",
+                description="Schedule appointment or send vehicle information",
+                type="follow_up",
+                lead_id=lead_id,
+                due_date=datetime.utcnow() + timedelta(hours=24),
+                is_ai_generated=True
+            )
+            await db.tasks.insert_one(task.dict())
+        
+        return {"message": "Lead status updated successfully"}
+        
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@api_router.post("/leads/{lead_id}/convert")
+async def convert_lead_to_deal(lead_id: str, conversion_data: dict):
+    """Convert lead to deal"""
+    try:
+        # Get lead
+        lead = await db.leads.find_one({"id": lead_id})
+        if not lead:
+            raise HTTPException(status_code=404, detail="Lead not found")
+        
+        # Create customer from lead
+        customer_data = {
+            "first_name": lead["first_name"],
+            "last_name": lead["last_name"],
+            "email": lead.get("email"),
+            "phone": lead.get("phone"),
+            "address": lead.get("address"),
+            "city": lead.get("city"),
+            "state": lead.get("state"),
+            "zip_code": lead.get("zip_code")
+        }
+        
+        # Create deal
+        deal_data = {
+            "customer": customer_data,
+            "vehicle": conversion_data.get("vehicle"),
+            "salesperson": lead.get("assigned_salesperson")
+        }
+        
+        # Use existing deal creation logic
+        deal_response = await create_deal(DealCreate(**deal_data))
+        
+        # Update lead with conversion
+        await db.leads.update_one(
+            {"id": lead_id},
+            {"$set": {
+                "status": "sold",
+                "converted_deal_id": deal_response.id,
+                "updated_at": datetime.utcnow()
+            }}
+        )
+        
+        return {"message": "Lead converted to deal successfully", "deal_id": deal_response.id}
+        
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+# Communication Management
+@api_router.post("/communications", response_model=Communication)
+async def create_communication(comm_data: dict):
+    """Create a new communication record"""
+    try:
+        communication = Communication(**comm_data)
+        await db.communications.insert_one(communication.dict())
+        return communication
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@api_router.get("/communications")
+async def get_communications(
+    lead_id: Optional[str] = None,
+    customer_id: Optional[str] = None,
+    deal_id: Optional[str] = None,
+    type: Optional[str] = None
+):
+    """Get communications with filtering"""
+    try:
+        query = {}
+        if lead_id:
+            query["lead_id"] = lead_id
+        if customer_id:
+            query["customer_id"] = customer_id
+        if deal_id:
+            query["deal_id"] = deal_id
+        if type:
+            query["type"] = type
+        
+        communications = await db.communications.find(query).sort("created_at", -1).to_list(100)
+        return [Communication(**comm) for comm in communications]
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@api_router.post("/communications/ai-response")
+async def generate_ai_communication(request_data: dict):
+    """Generate AI-powered communication response"""
+    try:
+        prompt = request_data.get("prompt")
+        context = request_data.get("context", {})
+        response_type = request_data.get("type", "email")
+        
+        response = await generate_ai_response(prompt, context, response_type)
+        
+        return {"response": response, "type": response_type}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@api_router.post("/communications/auto-respond")
+async def send_auto_response(request_data: dict):
+    """Send automatic AI response to customer inquiry"""
+    try:
+        inquiry = request_data.get("inquiry")
+        lead_id = request_data.get("lead_id")
+        
+        # Get lead data
+        lead = await db.leads.find_one({"id": lead_id})
+        if not lead:
+            raise HTTPException(status_code=404, detail="Lead not found")
+        
+        # Generate response
+        response = await auto_respond_to_inquiry(inquiry, lead)
+        
+        # Create communication record
+        communication = Communication(
+            lead_id=lead_id,
+            type="email",
+            direction="outbound",
+            subject="Response to your inquiry",
+            content=response,
+            to_email=lead.get("email"),
+            is_ai_generated=True,
+            ai_model="gpt-4"
+        )
+        
+        await db.communications.insert_one(communication.dict())
+        
+        return {"message": "Auto-response sent", "response": response}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+# Task Management
+@api_router.post("/tasks", response_model=Task)
+async def create_task(task_data: dict):
+    """Create a new task"""
+    try:
+        task = Task(**task_data)
+        await db.tasks.insert_one(task.dict())
+        return task
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@api_router.get("/tasks")
+async def get_tasks(
+    assigned_to: Optional[str] = None,
+    status: Optional[str] = None,
+    type: Optional[str] = None,
+    lead_id: Optional[str] = None
+):
+    """Get tasks with filtering"""
+    try:
+        query = {}
+        if assigned_to:
+            query["assigned_to"] = assigned_to
+        if status:
+            query["status"] = status
+        if type:
+            query["type"] = type
+        if lead_id:
+            query["lead_id"] = lead_id
+        
+        tasks = await db.tasks.find(query).sort("due_date", 1).to_list(100)
+        return [Task(**task) for task in tasks]
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@api_router.put("/tasks/{task_id}/complete")
+async def complete_task(task_id: str):
+    """Mark task as completed"""
+    try:
+        result = await db.tasks.update_one(
+            {"id": task_id},
+            {"$set": {
+                "status": "completed",
+                "completed_at": datetime.utcnow(),
+                "updated_at": datetime.utcnow()
+            }}
+        )
+        
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail="Task not found")
+        
+        return {"message": "Task completed successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+# Analytics & Insights
+@api_router.get("/analytics/lead-insights/{lead_id}")
+async def get_lead_insights(lead_id: str):
+    """Get AI-powered insights for a specific lead"""
+    try:
+        # Get lead communications
+        communications = await db.communications.find({"lead_id": lead_id}).to_list(100)
+        
+        if not communications:
+            return {"insights": "No communications available for analysis"}
+        
+        # Generate AI insights
+        insights = await generate_communication_insights(communications)
+        
+        # Get lead score and other metrics
+        lead = await db.leads.find_one({"id": lead_id})
+        
+        return {
+            "lead_score": lead.get("score", 0) if lead else 0,
+            "communication_count": len(communications),
+            "last_contact": communications[0].get("created_at") if communications else None,
+            "ai_insights": insights
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@api_router.get("/analytics/dashboard")
+async def get_dashboard_analytics():
+    """Get comprehensive CRM analytics"""
+    try:
+        # Get counts
+        total_leads = await db.leads.count_documents({})
+        new_leads = await db.leads.count_documents({"status": "new"})
+        qualified_leads = await db.leads.count_documents({"status": "qualified"})
+        converted_leads = await db.leads.count_documents({"status": "sold"})
+        
+        # Get recent communications
+        recent_comms = await db.communications.count_documents({
+            "created_at": {"$gte": datetime.utcnow() - timedelta(days=7)}
+        })
+        
+        # Get pending tasks
+        pending_tasks = await db.tasks.count_documents({"status": "pending"})
+        
+        # Calculate conversion rate
+        conversion_rate = (converted_leads / total_leads * 100) if total_leads > 0 else 0
+        
+        return {
+            "total_leads": total_leads,
+            "new_leads": new_leads,
+            "qualified_leads": qualified_leads,
+            "converted_leads": converted_leads,
+            "conversion_rate": round(conversion_rate, 2),
+            "recent_communications": recent_comms,
+            "pending_tasks": pending_tasks
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+# AI Agent Management
+@api_router.post("/ai-agents", response_model=AIAgent)
+async def create_ai_agent(agent_data: dict):
+    """Create a new AI agent"""
+    try:
+        agent = AIAgent(**agent_data)
+        await db.ai_agents.insert_one(agent.dict())
+        return agent
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@api_router.get("/ai-agents")
+async def get_ai_agents():
+    """Get all AI agents"""
+    try:
+        agents = await db.ai_agents.find({"is_active": True}).to_list(100)
+        return [AIAgent(**agent) for agent in agents]
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
 # Deal Management Endpoints
 @api_router.post("/deals", response_model=Deal)
 async def create_deal(deal_data: DealCreate):
