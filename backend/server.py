@@ -60,6 +60,36 @@ class VSCCoverage(str, Enum):
     BUMPER_TO_BUMPER = "bumper_to_bumper"
     PREMIUM = "premium"
 
+class FormType(str, Enum):
+    CREDIT_APPLICATION = "credit_application"
+    PURCHASE_AGREEMENT = "purchase_agreement"
+    FINANCE_CONTRACT = "finance_contract"
+    TITLE_REGISTRATION = "title_registration"
+    INSURANCE_CERTIFICATE = "insurance_certificate"
+    WINDOW_STICKER = "window_sticker"
+    ODOMETER_DISCLOSURE = "odometer_disclosure"
+    LEMON_LAW = "lemon_law"
+
+class FormStatus(str, Enum):
+    DRAFT = "draft"
+    PENDING_SIGNATURE = "pending_signature"
+    SIGNED = "signed"
+    COMPLETED = "completed"
+
+class LenderStatus(str, Enum):
+    SUBMITTED = "submitted"
+    PENDING = "pending"
+    APPROVED = "approved"
+    DECLINED = "declined"
+    CONDITIONAL = "conditional"
+
+class DocumentStatus(str, Enum):
+    DRAFT = "draft"
+    GENERATED = "generated"
+    SENT_FOR_SIGNATURE = "sent_for_signature"
+    SIGNED = "signed"
+    FINALIZED = "finalized"
+
 
 # Vehicle Models
 class Vehicle(BaseModel):
