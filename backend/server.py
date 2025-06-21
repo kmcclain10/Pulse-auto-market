@@ -445,7 +445,305 @@ class MenuSelectionRequest(BaseModel):
     selected_vsc_id: Optional[str] = None
     include_gap: bool = False
 
-# Business Logic Functions
+# Form Templates Database - Initialize all required forms
+def initialize_form_templates():
+    """Initialize all required form templates for different states"""
+    
+    templates = {
+        # PURCHASE AGREEMENT / BUYER'S ORDER
+        FormType.PURCHASE_AGREEMENT: {
+            "title": "Motor Vehicle Purchase Agreement",
+            "description": "Main contract outlining vehicle sale details, pricing, fees, taxes, and financing",
+            "fields": [
+                {"name": "dealer_name", "type": "text", "required": True, "label": "Dealer Name"},
+                {"name": "dealer_address", "type": "text", "required": True, "label": "Dealer Address"},
+                {"name": "dealer_license", "type": "text", "required": True, "label": "Dealer License Number"},
+                {"name": "customer_name", "type": "text", "required": True, "label": "Customer Full Name"},
+                {"name": "customer_address", "type": "text", "required": True, "label": "Customer Address"},
+                {"name": "customer_phone", "type": "text", "required": True, "label": "Customer Phone"},
+                {"name": "vehicle_year", "type": "number", "required": True, "label": "Vehicle Year"},
+                {"name": "vehicle_make", "type": "text", "required": True, "label": "Vehicle Make"},
+                {"name": "vehicle_model", "type": "text", "required": True, "label": "Vehicle Model"},
+                {"name": "vehicle_vin", "type": "text", "required": True, "label": "VIN"},
+                {"name": "vehicle_mileage", "type": "number", "required": True, "label": "Odometer Reading"},
+                {"name": "purchase_price", "type": "currency", "required": True, "label": "Purchase Price"},
+                {"name": "trade_in_value", "type": "currency", "required": False, "label": "Trade-in Value"},
+                {"name": "sales_tax", "type": "currency", "required": True, "label": "Sales Tax"},
+                {"name": "title_fee", "type": "currency", "required": True, "label": "Title Fee"},
+                {"name": "license_fee", "type": "currency", "required": True, "label": "License Fee"},
+                {"name": "doc_fee", "type": "currency", "required": True, "label": "Documentation Fee"},
+                {"name": "total_amount", "type": "currency", "required": True, "label": "Total Amount"},
+                {"name": "financing", "type": "boolean", "required": True, "label": "Financing Required"},
+                {"name": "delivery_date", "type": "date", "required": True, "label": "Delivery Date"}
+            ]
+        },
+        
+        # ODOMETER DISCLOSURE STATEMENT
+        FormType.ODOMETER_DISCLOSURE: {
+            "title": "Federal Odometer Disclosure Statement",
+            "description": "Required federal disclosure of vehicle mileage at time of sale",
+            "fields": [
+                {"name": "transferor_name", "type": "text", "required": True, "label": "Transferor (Seller) Name"},
+                {"name": "transferee_name", "type": "text", "required": True, "label": "Transferee (Buyer) Name"},
+                {"name": "vehicle_year", "type": "number", "required": True, "label": "Vehicle Year"},
+                {"name": "vehicle_make", "type": "text", "required": True, "label": "Vehicle Make"},
+                {"name": "vehicle_model", "type": "text", "required": True, "label": "Vehicle Model"},
+                {"name": "vehicle_vin", "type": "text", "required": True, "label": "VIN"},
+                {"name": "odometer_reading", "type": "number", "required": True, "label": "Odometer Reading"},
+                {"name": "odometer_status", "type": "select", "required": True, "label": "Odometer Status",
+                 "options": ["Actual Mileage", "Not Actual Mileage", "Exceeds Mechanical Limits"]},
+                {"name": "transfer_date", "type": "date", "required": True, "label": "Date of Transfer"},
+                {"name": "transferor_signature", "type": "signature", "required": True, "label": "Transferor Signature"},
+                {"name": "transferee_signature", "type": "signature", "required": True, "label": "Transferee Signature"}
+            ]
+        },
+        
+        # TRUTH IN LENDING DISCLOSURE (TILA)
+        FormType.TRUTH_IN_LENDING: {
+            "title": "Truth-in-Lending Disclosure Statement",
+            "description": "Federal TILA disclosure of loan costs and terms",
+            "fields": [
+                {"name": "creditor_name", "type": "text", "required": True, "label": "Creditor Name"},
+                {"name": "customer_name", "type": "text", "required": True, "label": "Customer Name"},
+                {"name": "customer_address", "type": "text", "required": True, "label": "Customer Address"},
+                {"name": "annual_percentage_rate", "type": "percentage", "required": True, "label": "Annual Percentage Rate (APR)"},
+                {"name": "finance_charge", "type": "currency", "required": True, "label": "Finance Charge"},
+                {"name": "amount_financed", "type": "currency", "required": True, "label": "Amount Financed"},
+                {"name": "total_of_payments", "type": "currency", "required": True, "label": "Total of Payments"},
+                {"name": "payment_schedule", "type": "text", "required": True, "label": "Payment Schedule"},
+                {"name": "monthly_payment", "type": "currency", "required": True, "label": "Monthly Payment Amount"},
+                {"name": "number_of_payments", "type": "number", "required": True, "label": "Number of Payments"},
+                {"name": "first_payment_date", "type": "date", "required": True, "label": "First Payment Due Date"},
+                {"name": "security_interest", "type": "text", "required": True, "label": "Security Interest Description"},
+                {"name": "late_charge", "type": "currency", "required": False, "label": "Late Charge"},
+                {"name": "prepayment_penalty", "type": "text", "required": False, "label": "Prepayment Penalty"}
+            ]
+        },
+        
+        # DAMAGE DISCLOSURE STATEMENT
+        FormType.DAMAGE_DISCLOSURE: {
+            "title": "Motor Vehicle Damage Disclosure Statement",
+            "description": "Required disclosure of structural damage for used vehicles",
+            "fields": [
+                {"name": "dealer_name", "type": "text", "required": True, "label": "Dealer Name"},
+                {"name": "customer_name", "type": "text", "required": True, "label": "Customer Name"},
+                {"name": "vehicle_year", "type": "number", "required": True, "label": "Vehicle Year"},
+                {"name": "vehicle_make", "type": "text", "required": True, "label": "Vehicle Make"},
+                {"name": "vehicle_model", "type": "text", "required": True, "label": "Vehicle Model"},
+                {"name": "vehicle_vin", "type": "text", "required": True, "label": "VIN"},
+                {"name": "damage_disclosure", "type": "select", "required": True, "label": "Damage Disclosure",
+                 "options": ["No Damage", "Minor Damage", "Structural Damage", "Unknown"]},
+                {"name": "damage_description", "type": "textarea", "required": False, "label": "Damage Description"},
+                {"name": "repair_description", "type": "textarea", "required": False, "label": "Repair Description"},
+                {"name": "total_damage_cost", "type": "currency", "required": False, "label": "Total Damage/Repair Cost"},
+                {"name": "disclosure_date", "type": "date", "required": True, "label": "Disclosure Date"}
+            ]
+        },
+        
+        # TRADE-IN APPRAISAL
+        FormType.TRADE_IN_APPRAISAL: {
+            "title": "Trade-In Vehicle Appraisal",
+            "description": "Documentation of trade-in vehicle evaluation and value",
+            "fields": [
+                {"name": "trade_vehicle_year", "type": "number", "required": True, "label": "Trade Vehicle Year"},
+                {"name": "trade_vehicle_make", "type": "text", "required": True, "label": "Trade Vehicle Make"},
+                {"name": "trade_vehicle_model", "type": "text", "required": True, "label": "Trade Vehicle Model"},
+                {"name": "trade_vehicle_vin", "type": "text", "required": True, "label": "Trade Vehicle VIN"},
+                {"name": "trade_vehicle_mileage", "type": "number", "required": True, "label": "Trade Vehicle Mileage"},
+                {"name": "trade_vehicle_condition", "type": "select", "required": True, "label": "Vehicle Condition",
+                 "options": ["Excellent", "Good", "Fair", "Poor"]},
+                {"name": "exterior_condition", "type": "textarea", "required": True, "label": "Exterior Condition Notes"},
+                {"name": "interior_condition", "type": "textarea", "required": True, "label": "Interior Condition Notes"},
+                {"name": "mechanical_condition", "type": "textarea", "required": True, "label": "Mechanical Condition Notes"},
+                {"name": "book_value", "type": "currency", "required": True, "label": "Book Value"},
+                {"name": "appraised_value", "type": "currency", "required": True, "label": "Appraised Value"},
+                {"name": "trade_allowance", "type": "currency", "required": True, "label": "Trade Allowance"},
+                {"name": "payoff_amount", "type": "currency", "required": False, "label": "Payoff Amount"},
+                {"name": "net_trade_value", "type": "currency", "required": True, "label": "Net Trade Value"},
+                {"name": "appraiser_name", "type": "text", "required": True, "label": "Appraiser Name"},
+                {"name": "appraisal_date", "type": "date", "required": True, "label": "Appraisal Date"}
+            ]
+        },
+        
+        # EXTENDED WARRANTY CONTRACT
+        FormType.EXTENDED_WARRANTY: {
+            "title": "Extended Warranty Service Contract",
+            "description": "Vehicle Service Contract for extended warranty coverage",
+            "fields": [
+                {"name": "contract_number", "type": "text", "required": True, "label": "Contract Number"},
+                {"name": "customer_name", "type": "text", "required": True, "label": "Customer Name"},
+                {"name": "customer_address", "type": "text", "required": True, "label": "Customer Address"},
+                {"name": "vehicle_year", "type": "number", "required": True, "label": "Vehicle Year"},
+                {"name": "vehicle_make", "type": "text", "required": True, "label": "Vehicle Make"},
+                {"name": "vehicle_model", "type": "text", "required": True, "label": "Vehicle Model"},
+                {"name": "vehicle_vin", "type": "text", "required": True, "label": "VIN"},
+                {"name": "mileage_at_sale", "type": "number", "required": True, "label": "Mileage at Sale"},
+                {"name": "coverage_type", "type": "select", "required": True, "label": "Coverage Type",
+                 "options": ["Powertrain", "Bumper-to-Bumper", "Premium", "Named Component"]},
+                {"name": "contract_term", "type": "select", "required": True, "label": "Contract Term",
+                 "options": ["12 months", "24 months", "36 months", "48 months", "60 months"]},
+                {"name": "mileage_limit", "type": "number", "required": True, "label": "Mileage Limit"},
+                {"name": "contract_price", "type": "currency", "required": True, "label": "Contract Price"},
+                {"name": "deductible", "type": "currency", "required": True, "label": "Deductible Amount"},
+                {"name": "effective_date", "type": "date", "required": True, "label": "Effective Date"},
+                {"name": "expiration_date", "type": "date", "required": True, "label": "Expiration Date"}
+            ]
+        }
+    }
+    
+    return templates
+
+# State-specific form requirements
+def get_state_form_requirements(state_code: str):
+    """Get required forms for specific state"""
+    
+    state_requirements = {
+        "CA": {
+            "required_forms": [
+                FormType.PURCHASE_AGREEMENT,
+                FormType.ODOMETER_DISCLOSURE,
+                FormType.TRUTH_IN_LENDING,
+                FormType.SMOG_CERTIFICATE,
+                FormType.DAMAGE_DISCLOSURE
+            ],
+            "additional_fees": {
+                "smog_fee": 20.00,
+                "tire_fee": 1.75
+            }
+        },
+        "TX": {
+            "required_forms": [
+                FormType.PURCHASE_AGREEMENT,
+                FormType.ODOMETER_DISCLOSURE,
+                FormType.TRUTH_IN_LENDING,
+                FormType.SAFETY_INSPECTION
+            ],
+            "additional_fees": {
+                "inspection_fee": 12.50
+            }
+        },
+        "FL": {
+            "required_forms": [
+                FormType.PURCHASE_AGREEMENT,
+                FormType.ODOMETER_DISCLOSURE,
+                FormType.TRUTH_IN_LENDING,
+                FormType.DAMAGE_DISCLOSURE
+            ],
+            "additional_fees": {}
+        },
+        "NY": {
+            "required_forms": [
+                FormType.PURCHASE_AGREEMENT,
+                FormType.ODOMETER_DISCLOSURE,
+                FormType.TRUTH_IN_LENDING,
+                FormType.DAMAGE_DISCLOSURE,
+                FormType.LEMON_LAW_DISCLOSURE
+            ],
+            "additional_fees": {
+                "dmv_fee": 50.00
+            }
+        }
+    }
+    
+    return state_requirements.get(state_code, state_requirements["CA"])  # Default to CA
+
+# Document generation functions
+def generate_purchase_agreement_pdf(deal_data: Dict) -> str:
+    """Generate Purchase Agreement PDF"""
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter)
+    styles = getSampleStyleSheet()
+    story = []
+    
+    # Title
+    title = Paragraph("MOTOR VEHICLE PURCHASE AGREEMENT", styles['Title'])
+    story.append(title)
+    story.append(Spacer(1, 12))
+    
+    # Dealer Information
+    dealer_info = f"""
+    <b>DEALER INFORMATION:</b><br/>
+    Dealer Name: {deal_data.get('dealer_name', 'ABC Motors')}<br/>
+    Address: {deal_data.get('dealer_address', '123 Main St, City, State 12345')}<br/>
+    License #: {deal_data.get('dealer_license', 'DL123456')}<br/>
+    Phone: {deal_data.get('dealer_phone', '(555) 123-4567')}
+    """
+    story.append(Paragraph(dealer_info, styles['Normal']))
+    story.append(Spacer(1, 12))
+    
+    # Customer Information
+    customer = deal_data.get('customer', {})
+    customer_info = f"""
+    <b>PURCHASER INFORMATION:</b><br/>
+    Name: {customer.get('first_name', '')} {customer.get('last_name', '')}<br/>
+    Address: {customer.get('address', '')}<br/>
+    City, State: {customer.get('city', '')}, {customer.get('state', '')}<br/>
+    ZIP: {customer.get('zip_code', '')}<br/>
+    Phone: {customer.get('phone', '')}
+    """
+    story.append(Paragraph(customer_info, styles['Normal']))
+    story.append(Spacer(1, 12))
+    
+    # Vehicle Information
+    vehicle = deal_data.get('vehicle', {})
+    vehicle_info = f"""
+    <b>VEHICLE INFORMATION:</b><br/>
+    Year: {vehicle.get('year', '')}<br/>
+    Make: {vehicle.get('make', '')}<br/>
+    Model: {vehicle.get('model', '')}<br/>
+    VIN: {vehicle.get('vin', '')}<br/>
+    Mileage: {vehicle.get('mileage', 0):,}<br/>
+    Condition: {vehicle.get('condition', '').title()}
+    """
+    story.append(Paragraph(vehicle_info, styles['Normal']))
+    story.append(Spacer(1, 12))
+    
+    # Pricing Table
+    pricing_data = [
+        ['ITEM', 'AMOUNT'],
+        ['Vehicle Price', f"${vehicle.get('selling_price', 0):,.2f}"],
+        ['Trade-in Value', f"${deal_data.get('trade_in_value', 0):,.2f}"],
+        ['Sales Tax', f"${deal_data.get('sales_tax', 0):,.2f}"],
+        ['Title Fee', f"${deal_data.get('title_fee', 0):,.2f}"],
+        ['License Fee', f"${deal_data.get('license_fee', 0):,.2f}"],
+        ['Documentation Fee', f"${deal_data.get('doc_fee', 0):,.2f}"],
+        ['TOTAL AMOUNT', f"${deal_data.get('total_deal_amount', 0):,.2f}"]
+    ]
+    
+    pricing_table = Table(pricing_data, colWidths=[3*inch, 2*inch])
+    pricing_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 14),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black),
+        ('BACKGROUND', (0, -1), (-1, -1), colors.lightgrey),
+        ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+    ]))
+    
+    story.append(pricing_table)
+    story.append(Spacer(1, 24))
+    
+    # Signature Section
+    signature_section = """
+    <b>SIGNATURES:</b><br/><br/>
+    Customer Signature: _________________________________ Date: ___________<br/><br/>
+    Print Name: _________________________________<br/><br/><br/>
+    Dealer Representative: _________________________________ Date: ___________<br/><br/>
+    Print Name: _________________________________
+    """
+    story.append(Paragraph(signature_section, styles['Normal']))
+    
+    # Build PDF
+    doc.build(story)
+    pdf_bytes = buffer.getvalue()
+    buffer.close()
+    
+    # Return base64 encoded PDF
+    return base64.b64encode(pdf_bytes).decode('utf-8')
 def calculate_finance_payment(loan_amount: float, apr: float, term_months: int) -> Dict[str, float]:
     """Calculate monthly payment and total interest for a loan"""
     if apr == 0:
