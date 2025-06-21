@@ -273,6 +273,9 @@ frontend:
       - working: false
         agent: "testing"
         comment: "Found the root cause: The real dealer scraper is failing because Playwright is not properly installed. The backend logs show the error: 'Executable doesn't exist at /root/.cache/ms-playwright/chromium-1091/chrome-linux/chrome'. This means the Playwright browser binaries are missing, so the scraper cannot navigate to dealer websites to extract real photos. The system is falling back to placeholder images instead."
+      - working: false
+        agent: "testing"
+        comment: "Further investigation reveals that there are two scraper implementations: real_dealer_scraper.py (which attempts to use Playwright to get real photos) and real_scraper.py (which contains a fallback mechanism that generates placeholder SVG images). When the real_dealer_scraper.py fails due to missing Playwright browser binaries, the system falls back to using the placeholder images from real_scraper.py. The placeholder SVG explicitly contains the text 'No Image Available'. To fix this issue, we need to properly install Playwright and its browser dependencies using 'playwright install' or modify the scraper to use a different approach for fetching real dealer photos."
 
 metadata:
   created_by: "main_agent"
