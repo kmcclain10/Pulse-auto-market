@@ -82,8 +82,10 @@ def test_document_generation():
     }
     
     print("Generating documents...")
+    print(f"Document request: {json.dumps(document_request, indent=2)}")
     response = requests.post(f"{BACKEND_URL}/deals/{deal_id}/documents/generate", json=document_request)
     print(f"Document generation response: {response.status_code}")
+    print(f"Request URL: {BACKEND_URL}/deals/{deal_id}/documents/generate")
     
     if response.status_code != 200:
         print(f"Document generation failed: {response.text}")
