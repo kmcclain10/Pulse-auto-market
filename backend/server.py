@@ -1342,7 +1342,7 @@ class DocumentGenerationRequest(BaseModel):
     document_types: List[str]
 
 @api_router.post("/deals/{deal_id}/documents/generate")
-async def generate_deal_documents(deal_id: str, request: DocumentGenerationRequest):
+async def generate_deal_documents(deal_id: str, request: dict):
     """Generate documents for a deal"""
     try:
         # Get deal data
@@ -1351,15 +1351,21 @@ async def generate_deal_documents(deal_id: str, request: DocumentGenerationReque
             raise HTTPException(status_code=404, detail="Deal not found")
         
         # Convert MongoDB document to dict and handle ObjectId
-        deal_dict = {}
-        for key, value in deal.items():
-            if key == '_id':
-                continue
-            deal_dict[key] = value
+        def convert_objectid(obj):
+            if isinstance(obj, ObjectId):
+                return str(obj)
+            elif isinstance(obj, dict):
+                return {key: convert_objectid(value) for key, value in obj.items()}
+            elif isinstance(obj, list):
+                return [convert_objectid(item) for item in obj]
+            return obj
+        
+        deal_dict = convert_objectid(deal)
+        document_types = request.get("document_types", [])
         
         generated_docs = []
         
-        for doc_type in request.document_types:
+        for doc_type in document_types:
             pdf_content = None
             title = ""
             
@@ -1387,12 +1393,14 @@ async def generate_deal_documents(deal_id: str, request: DocumentGenerationReque
                 title=title,
                 generated_content=f"<p>{title} Generated</p>",
                 pdf_content=pdf_content,
-                variables_used=deal,
+                variables_used=deal_dict,
                 status=DocumentStatus.GENERATED,
                 signature_required=True
             )
             
-            await db.documents.insert_one(doc.dict())
+            # Convert to dict and handle ObjectId before saving
+            doc_dict = doc.dict()
+            await db.documents.insert_one(doc_dict)
             generated_docs.append(doc)
         
         # Update deal
@@ -1402,7 +1410,7 @@ async def generate_deal_documents(deal_id: str, request: DocumentGenerationReque
             {"$addToSet": {"documents": {"$each": doc_ids}}, "$set": {"docs_generated": True, "updated_at": datetime.utcnow()}}
         )
         
-        return {"message": f"Generated {len(generated_docs)} documents", "documents": generated_docs}
+        return {"message": f"Generated {len(generated_docs)} documents", "documents": [doc.dict() for doc in generated_docs]}
         
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
